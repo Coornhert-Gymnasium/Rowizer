@@ -116,12 +116,39 @@ class Changes {
             })
         })
         
+        //bepalen van lesuren (timeslot) voor exams zonder lesuur maar met start en eindtijd        
+        let timeslots = this.connector.getTodayTimeSlots()
+        timeslots.sort((a,b)=> a.startDt - b.startDt)
+        
+        Object.values(modified_appointments).forEach(appointment=>{
+            if (appointment.type === "exam" && appointment.startTimeSlot === null) {
+
+                let startTime = new Date(appointment.start * 1000).getHours() + ":" + ("00" + new Date(appointment.start * 1000).getMinutes()).slice(-2)
+                let endTime = new Date(appointment.end * 1000).getHours() + ":" + ("00" + new Date(appointment.end * 1000).getMinutes()).slice(-2)
+                appointment.locations[0] += " " + startTime + "-" + endTime
+                
+                let startSlot = timeslots.find(slot=> appointment.start <= slot.endDt.getTime()/1000)
+                let startSlotIndex = timeslots.indexOf(startSlot) + 1;
+                if (startSlotIndex === 0) startSlotIndex = 1; // start voor of precies 8.30 
+                let endSlot = timeslots.find(slot=> appointment.end <= slot.endDt.getTime()/1000)
+                let endSlotIndex = timeslots.length + 1;
+                if (endSlot !== undefined) {
+                     endSlotIndex = timeslots.indexOf(endSlot) + 1;
+                }
+
+                appointment.startTimeSlot = startSlotIndex
+                appointment.endTimeSlot = endSlotIndex
+            }
+        })
+
+        // LET OP: mergeSubsequentAppointments returned een array (lijst),
+        //  modified_appointments is hierboven een object (dictionary) met appointment.id als key en appointment als value
         if(this.#mergeMultipleHourSpan){
             modified_appointments =  mergeSubsequentAppointments(Object.values(modified_appointments))
             //this.#combineSpansMultipleHours(modified_appointments)
-        }
+        } 
 
-        modified_appointments.forEach(appointment=>{
+        Object.values(modified_appointments).forEach(appointment=>{
             //bepalen of er hele afdelingen en/of jaarlagen in zitten
             //years heeft jaren als key en array met departments als value
             let years = {}
@@ -190,36 +217,6 @@ class Changes {
 
 
 
-        })
-
-        // TK HACK
-        // HELP
-        // DIT IS ASYNC
-        // VERPLAATS NAAR VIEW????
-        let timeslots = this.connector.getTodayTimeSlots()
-        timeslots.sort((a,b)=> a.startDt - b.startDt)
-        
-        modified_appointments.forEach(appointment=>{
-            if (appointment.type === "exam" && appointment.startTimeSlot === null) {
-
-                let startTime = new Date(appointment.start * 1000).getHours() + ":" + ("00" + new Date(appointment.start * 1000).getMinutes()).slice(-2)
-                let endTime = new Date(appointment.end * 1000).getHours() + ":" + ("00" + new Date(appointment.end * 1000).getMinutes()).slice(-2)
-                appointment.locations[0] += " " + startTime + "-" + endTime
-                
-                let startSlot = timeslots.find(slot=> appointment.start <= slot.endDt.getTime()/1000)
-                let startSlotIndex = timeslots.indexOf(startSlot) + 1;
-                if (startSlotIndex === 0) startSlotIndex = 1; // start voor of precies 8.30 
-                let endSlot = timeslots.find(slot=> appointment.end <= slot.endDt.getTime()/1000)
-                //let endSlotIndex = timeslots.indexOf(endSlot) + 1
-                let endSlotIndex = timeslots.length + 1;
-                if (endSlot != undefined) {
-                     endSlotIndex = timeslots.indexOf(endSlot) + 1;
-                }
-
-                appointment.startTimeSlot = startSlotIndex
-                appointment.endTimeSlot = endSlotIndex
-                // TODO naar boven plaatsen zodat "mergeappointsments" kan gebeuren. Maar async / await probleem.
-            }
         })
 
         let modified_objects_object = {}
