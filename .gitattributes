@@ -1,0 +1,2 @@
+# shell scripts moeten LF houden (anders werkt sh niet op Windows-checkouts)
+*.sh text eol=lf
