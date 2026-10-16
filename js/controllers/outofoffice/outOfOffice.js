@@ -29,15 +29,17 @@ export default class OutOfOffice {
         })
 
         if(Object.keys(location).length !== 1){
-            //TODO: error?
-            throw new Error("No location can be set")
+            // optioneel: zonder (unieke) locatie met deze naam tonen we geen 'extern'-docenten
+            console.info("No unique location named '" + name + "', not showing teachers out of office")
+            this.#location = undefined
+            return undefined
         }
         this.#location = Object.keys(location)[0]
         return this.#location
     }
 
     async loadAll(){
-        if(!this.connector.date.isWeekDay()){
+        if(!this.#location || !this.connector.date.isWeekDay()){
             return []
         }
 
