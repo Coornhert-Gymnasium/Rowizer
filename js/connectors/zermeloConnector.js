@@ -212,7 +212,12 @@ export default class ZermeloConnector extends connector {
     getTodayTimeSlots(){
         //FIXME: multiple departmensOfBranch can have different timetables
 
-        let realized_table = this.#dayTimeTables[Object.values(this.#realizedWeekTimeTables)[0][this.#date.toLocaleDateString("en-EN", { weekday: 'long' }).toLowerCase()]]
+        let week_table = Object.values(this.#realizedWeekTimeTables)[0]
+        let realized_table = week_table && this.#dayTimeTables[week_table[this.#date.toLocaleDateString("en-EN", { weekday: 'long' }).toLowerCase()]]
+        if(!realized_table){
+            // geen rooster voor deze dag (bv. weekend)
+            return []
+        }
         return realized_table.timeSlots.map(slot_id=> {
             let slot =  this.#timeslots[slot_id]
             slot.startDt = new Date(this.#date.getTime())

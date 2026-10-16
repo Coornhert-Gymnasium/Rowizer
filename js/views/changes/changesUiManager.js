@@ -70,7 +70,7 @@ export class ChangesUiManager {
         let changes = []
         // Hier wordt normaal gefilterd op of er een lesgroep gekoppeld is aan een afspraak. 
         // laat nu alles zien: exams en keuzelessen hebben geen afspraak
-        let app_filtered = Object.values(this.changesManager.appointments) //.filter((app => app.groupsInDepartments.length)
+        let app_filtered = Object.values(this.changesManager.appointments)
 
         let do_app = function (apps, cm) {
             apps.forEach(appointment => {

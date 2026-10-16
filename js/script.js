@@ -66,38 +66,24 @@ $(document).ready(function () {
     }
     window.dc = dayChanged
 
+    // Dagwissel-check staat bewust los van het laden van data: ook als het laden
+    // faalt (bv. op een dag zonder rooster) moet de pagina weer herladen worden.
+    let last_checked_date = new Date();
+    setInterval(()=> {
+        let new_date = new Date();
+        if(last_checked_date.toDateString() !== new_date.toDateString()){
+            location.reload()
+        }
+    }, 60*1000)
+
     connector.waitUntilReady().then(a=>{
         changesManager.loadData().then(cm => {
             changesUiManager.makeTable();
             changesUiManager.fillTable();
-            var last_checked_date = new Date();
             setInterval(()=> {
-
-                let new_date = new Date();
-                if(last_checked_date.toDateString() !== new_date.toDateString()){
-                    // day changed, reload page
-                    location.reload()
-                    let diff = Math.round((new_date.getTime() - last_checked_date.getTime())/ (1000 * 3600 * 24));
-                    let new_date_obk = new Date(connector.date)
-                    new_date_obk.setDate(new_date_obk.getDate() + diff);
-                    last_checked_date = new_date;
-                    connector.setDate(new_date_obk).then(a=>{
-                        changesManager.reset()
-                        $("#title").text("Roosterwijzigingen " + connector.date.toLocaleString("nl-NL", {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        }))
-                        absences.reset()
-
-                    })
-
-                }
                 changesUiManager.refreshTable();
-
             }, 5*60*1000)
-        })
+        }).catch(console.error)
         absencesUiManager.refresh().then(a=>{
             setInterval(()=>{
                 absencesUiManager.refresh();
