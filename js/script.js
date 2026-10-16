@@ -8,6 +8,7 @@ import AbsenceEntity from "./controllers/absences/absenceEntity.js";
 import {AbsencesUiManager} from "./views/absences/absencesUiManager.js";
 import OutOfOffice from "./controllers/outofoffice/outOfOffice.js";
 import {OutOfOfficeUiManager} from "./views/outOfOffice/outOfOfficeUiManager.js";
+import {VERSION} from "./version.js";
 
 let params = new URLSearchParams(window.location.search)
 
@@ -20,7 +21,7 @@ var zapi = new ZermeloApi({
 
 
 $(document).ready(function () {
-    console.log("loadedsdsdsd")
+    console.log("Rowizer loaded, version " + VERSION)
     //TODO: remove this
     //window.pretendLikeIts = 1717452000000/1000;
 
