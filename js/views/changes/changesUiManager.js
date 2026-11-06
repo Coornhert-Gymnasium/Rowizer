@@ -74,68 +74,89 @@ export class ChangesUiManager {
 
         let do_app = function (apps, cm) {
             apps.forEach(appointment => {
+                try {
                 
-                if (appointment.id === 1316992) {
-                    debugger;
-                }
-                if(appointment.groupsInDepartments.length != 0){
-                    appointment.groupsInDepartments.forEach(group_id => {
+                    if (appointment.id === 1316992) {
+                        debugger;
+                    }
+                    if(appointment.groupsInDepartments.length != 0){
+                        appointment.groupsInDepartments.forEach(group_id => {
 
-                        let group = cm.connector.getGroupInDepartment(group_id)
-                        let branch = cm.connector.getDepartmentOfBranch(group.departmentOfBranch)
-                        let i = appointment.startTimeSlot
-
-
-                        if(appointment.type === "activity" || appointment.type === "exam") {
-                            if (appointment.cancelled && changes.find(c => c.entity.id === group.id && c.period_start <= appointment.startTimeSlot && c.period_end >= appointment.endTimeSlot)){
+                            let group = cm.connector.getGroupInDepartment(group_id)
+                            let branch = group && cm.connector.getDepartmentOfBranch(group.departmentOfBranch)
+                            if (!branch) {
+                                console.warn("Appointment " + appointment.id + ": unknown group or department for group " + group_id)
                                 return;
                             }
-                            changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment))
-                        } else {
-                            while (i <= appointment.endTimeSlot) {
-                                //filteren van dingen die tegelijk met activiteiten uitvallen
-                                if (changes.find(c => c.entity.id === group.id && c.period_start <= i && c.period_end >= i)) {
+                            let i = appointment.startTimeSlot
+
+
+                            if(appointment.type === "activity" || appointment.type === "exam") {
+                                if (appointment.cancelled && changes.find(c => c.entity.id === group.id && c.period_start <= appointment.startTimeSlot && c.period_end >= appointment.endTimeSlot)){
                                     return;
                                 }
+                                changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment))
+                            } else {
+                                while (i <= appointment.endTimeSlot) {
+                                    //filteren van dingen die tegelijk met activiteiten uitvallen
+                                    if (changes.find(c => c.entity.id === group.id && c.period_start <= i && c.period_end >= i)) {
+                                        return;
+                                    }
 
-                                i++;
+                                    i++;
+                                }
+                                changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
                             }
-                            changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
-                        }
-                    })
-                } else if (appointment.students.length != 0 ) {
-                    //
-                    // HELP DIT IS EEN STOMME HACK
-                    // DIT MOET NIET HIER
-                    //
-                    // Model-view-controller... -> dit moet in de connector::changes. 
-                    //
-                    //console.log("appointment with students but no group in department: " + appointment.type);
-                    //console.log(appointment)
-                    // loop alle studenten langs, en haal hun afdeling (klas) op.
-                    let depts = new Set()
+                        })
+                    } else if (appointment.students.length != 0 ) {
+                        //
+                        // HELP DIT IS EEN STOMME HACK
+                        // DIT MOET NIET HIER
+                        //
+                        // Model-view-controller... -> dit moet in de connector::changes. 
+                        //
+                        //console.log("appointment with students but no group in department: " + appointment.type);
+                        //console.log(appointment)
+                        // loop alle studenten langs, en haal hun afdeling (klas) op.
+                        let depts = new Set()
+                        let unknown_students = 0
                         appointment.students.forEach(student => {
-                        let dept = cm.connector.getStudentInDepartment(student).departmentOfBranch;
-                        depts.add(dept);
-                    })
-                    // maak voor alle afdelingen een fake groep aan, en voeg die toe aan de changes.
-                    //  De naam van de groep is de opmerking van de roostermaker "remark / schedulerremake" in zermelo
-                    depts.forEach(dept => {
-                        let branch = cm.connector.getDepartmentOfBranch(dept)
-                        // Maak een fake group, met naam uit "subject" van de afspraak, en extended name uit "remark" van de afspraak. 
-                        // Niet elke afspraak heeft een vak: gebruik dan alleen de opmerking als naam.
-                        let subject = appointment.subjects[0]
-                        let remark = subject ? subject.substring(0, 6) : ""
-                        if (appointment.type === "exam" || !subject) {
-                            // toetsen krijgen uitgebreide beschrijving:
-                            remark = (remark + " " + (appointment.remark || "")).trim();
+                            let student_in_department = cm.connector.getStudentInDepartment(student)
+                            if (student_in_department) {
+                                depts.add(student_in_department.departmentOfBranch);
+                            } else {
+                                unknown_students++
+                            }
+                        })
+                        if (unknown_students) {
+                            console.warn("Appointment " + appointment.id + ": " + unknown_students + " unknown student(s)")
                         }
-                        let group = {'id': appointment.id, 'departmentOfBranch': dept, 'name': remark, 'extendedName': remark, "isMainGroup": false, "isMentorGroup": false}
-                        changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
-                    })
-                } else {
-                    console.log("Skipping: " + appointment.type + " " + appointment.subjects);
-                    console.log(appointment)
+                        // maak voor alle afdelingen een fake groep aan, en voeg die toe aan de changes.
+                        //  De naam van de groep is de opmerking van de roostermaker "remark / schedulerremake" in zermelo
+                        depts.forEach(dept => {
+                            let branch = cm.connector.getDepartmentOfBranch(dept)
+                            if (!branch) {
+                                console.warn("Appointment " + appointment.id + ": unknown department " + dept)
+                                return;
+                            }
+                            // Maak een fake group, met naam uit "subject" van de afspraak, en extended name uit "remark" van de afspraak. 
+                            // Niet elke afspraak heeft een vak: gebruik dan alleen de opmerking als naam.
+                            let subject = appointment.subjects[0]
+                            let remark = subject ? subject.substring(0, 6) : ""
+                            if (appointment.type === "exam" || !subject) {
+                                // toetsen krijgen uitgebreide beschrijving:
+                                remark = (remark + " " + (appointment.remark || "")).trim();
+                            }
+                            let group = {'id': appointment.id, 'departmentOfBranch': dept, 'name': remark, 'extendedName': remark, "isMainGroup": false, "isMentorGroup": false}
+                            changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
+                        })
+                    } else {
+                        console.log("Skipping: " + appointment.type + " " + appointment.subjects);
+                        console.log(appointment)
+                    }
+                } catch (e) {
+                    // Eén afspraak met onverwachte gegevens mag nooit het hele bord leeg laten.
+                    console.warn("Skipping appointment " + appointment.id, e, appointment)
                 }
             })
 
@@ -171,7 +192,15 @@ export class ChangesUiManager {
             return 0
         }).forEach(change => {
             let container = document.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
-            container.append(change.getElement())
+            if (!container) {
+                // geen rij voor deze jaarlaag, bv. een genegeerde afdeling of een afdeling zonder leerjaar
+                return
+            }
+            try {
+                container.append(change.getElement())
+            } catch (e) {
+                console.warn("Could not show appointment " + change.appointment.id, e, change.appointment)
+            }
 
         })
     }

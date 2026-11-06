@@ -125,7 +125,7 @@ class Changes {
 
                 let startTime = new Date(appointment.start * 1000).getHours() + ":" + ("00" + new Date(appointment.start * 1000).getMinutes()).slice(-2)
                 let endTime = new Date(appointment.end * 1000).getHours() + ":" + ("00" + new Date(appointment.end * 1000).getMinutes()).slice(-2)
-                appointment.locations[0] += " " + startTime + "-" + endTime
+                appointment.locations[0] = [appointment.locations[0], startTime + "-" + endTime].filter(Boolean).join(" ")
                 
                 let startSlot = timeslots.find(slot=> appointment.start <= slot.endDt.getTime()/1000)
                 let startSlotIndex = timeslots.indexOf(startSlot) + 1;
@@ -143,10 +143,11 @@ class Changes {
 
         // LET OP: mergeSubsequentAppointments returned een array (lijst),
         //  modified_appointments is hierboven een object (dictionary) met appointment.id als key en appointment als value
+        modified_appointments = Object.values(modified_appointments)
         if(this.#mergeMultipleHourSpan){
-            modified_appointments =  mergeSubsequentAppointments(Object.values(modified_appointments))
+            modified_appointments =  mergeSubsequentAppointments(modified_appointments)
             //this.#combineSpansMultipleHours(modified_appointments)
-        } 
+        }
 
         Object.values(modified_appointments).forEach(appointment=>{
             //bepalen of er hele afdelingen en/of jaarlagen in zitten
@@ -163,13 +164,17 @@ class Changes {
 
             appointment.groupsInDepartments.forEach(group_id=>{
                 let group = this.connector.groupsInDepartment[group_id]
+                let department = group && this.connector.departments[group.departmentOfBranch]
+                if(!department){
+                    console.warn("Appointment " + appointment.id + ": unknown group or department for group " + group_id)
+                    return
+                }
+
                 if(group.isMainGroup){
                     appointment.groupsMain.push(group_id)
                 }else{
                     appointment.groupsOther.push(group_id)
                 }
-
-                let department = this.connector.departments[group.departmentOfBranch]
 
                 if(!departments[department.id]){
                     departments[department.id] = []
@@ -202,7 +207,8 @@ class Changes {
             appointment.departmentsNotInCompleteYear = []
             Object.keys(years).forEach(year=>{
 
-                let departments_in_year = this.connector.yearsOfEducation[year].sort()
+                // een jaarlaag kan ontbreken, bv. als al haar afdelingen genegeerd worden
+                let departments_in_year = (this.connector.yearsOfEducation[year] || []).sort()
                 let departments_in_appointment = years[year].sort()
                 //if(departments_in_appointment.length > 1){debugger;}
                 if(departments_in_year.length === departments_in_appointment.length && JSON.stringify(departments_in_year) === JSON.stringify(departments_in_appointment)){

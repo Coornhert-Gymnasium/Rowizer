@@ -15,7 +15,7 @@ export default class OutOfOfficeUiRecord {
         let el = document.createElement("div");
         el.classList.add("outofoffice")
         let when_text = " "
-        when_text += this.outOfOffice.subject.replace("_", " ");
+        when_text += (this.outOfOffice.subject || "").replace("_", " ");
         el.innerText = when_text
         this.outOfOffice.appointments.sort((a,b)=>a.start-b.start).sort((a,b)=>(a.end-a.start)-(b.end-b.start))
         let timeslots = OutOfOfficeUiRecord.connector.getTodayTimeSlots()
@@ -24,11 +24,14 @@ export default class OutOfOfficeUiRecord {
         this.outOfOffice.appointments.forEach(appointment=>{
             let inner_el = document.createElement("div");
             let text = ""
-            if(appointment.startTimeSlot === timeslots[0].timeSlotName.rank && appointment.endTimeSlot === timeslots.at(-1).timeSlotName.rank){
+            // op een dag zonder rooster is er geen eerste of laatste lesuur
+            let first_rank = timeslots[0]?.timeSlotName.rank
+            let last_rank = timeslots.at(-1)?.timeSlotName.rank
+            if(appointment.startTimeSlot === first_rank && appointment.endTimeSlot === last_rank){
                //starts and ends at start/end of day
-            } else if (appointment.startTimeSlot === timeslots[0].timeSlotName.rank){
+            } else if (appointment.startTimeSlot === first_rank){
                 text += "t/m "+appointment.endTimeSlot +"e: "
-            } else if (appointment.endTimeSlot === timeslots.at(-1).timeSlotName.rank){
+            } else if (appointment.endTimeSlot === last_rank){
                 text += "va "+appointment.startTimeSlot +"e: "
             } else {
                 text += ""+appointment.startTimeSlot + "-" + appointment.endTimeSlot+": "
