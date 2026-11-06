@@ -13,7 +13,13 @@ export class OutOfOfficeUiManager {
         let outOfOffices = this.outOfOfficeManager.outOfOffices;
 
         let absences_ui_items = outOfOffices.map(abs => new OutOfOfficeUiRecord(abs))
-        absences_ui_items.forEach(abui => this.element.append(abui.getElement()))
+        absences_ui_items.forEach(abui => {
+            try {
+                this.element.append(abui.getElement())
+            } catch (e) {
+                console.warn("Could not show out of office item", e, abui.outOfOffice)
+            }
+        })
     }
 
     merge(){

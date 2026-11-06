@@ -4,6 +4,7 @@ import {mergeSubsequentAppointments, arraysEqual} from "../../zermelo/utils/merg
 class Changes {
     #date;
     #appointments;
+    #lastLoaded;
 
 
     #schoolInYear
@@ -40,24 +41,19 @@ class Changes {
 
         this.#appointmentCategories = {
             "activities": {
-                options: {type: 'activity'},
-                lastModified: 0
+                options: {type: 'activity'}
             },
             "exam": {
-                options: {type: 'exam'},
-                lastModified: 0
+                options: {type: 'exam'}
             },
             "modified": {
-                options: {modified: true},
-                lastModified: 0
+                options: {modified: true}
             },
             "cancelled": {
-                options: {cancelled: true},
-                lastModified: 0
+                options: {cancelled: true}
             },
             "invalid": {
-                options: {valid: false},
-                lastModified: 0
+                options: {valid: false}
             }
 
         }
@@ -72,12 +68,15 @@ class Changes {
         return this.#appointments
     }
     reset(){
-        Object.keys(this.#appointmentCategories).forEach(key =>{
-            this.#appointmentCategories[key].lastModified = 0;
-        })
         this.#appointments = {}
+        this.#lastLoaded = undefined
     }
 
+    /**
+     * Haalt altijd de hele dag op: zo verdwijnen ook wijzigingen die teruggedraaid of verwijderd zijn,
+     * en kan een mislukte poging geen afspraken overslaan.
+     * @return {Promise<boolean>} true if the appointments changed since the last time
+     */
     async loadData(){
         //TODO: remove debug props
 
@@ -93,7 +92,7 @@ class Changes {
         let category_promises = {}
         let categories_names = Object.keys(this.#appointmentCategories)
         categories_names.forEach(category_name =>{
-            category_promises[category_name] = this.connector.api.appointments.get({...common_data, ...this.#appointmentCategories[category_name].options, ...{modifiedSince: this.#appointmentCategories[category_name].lastModified}})
+            category_promises[category_name] = this.connector.api.appointments.get({...common_data, ...this.#appointmentCategories[category_name].options})
         }, this)
 
         let nameless_results = await Promise.all(Object.values(category_promises))
@@ -110,18 +109,15 @@ class Changes {
                     return;
                 }
                 modified_appointments[appointment.id] = appointment
-                if(appointment.lastModified > this.#appointmentCategories[category].lastModified){
-                    this.#appointmentCategories[category].lastModified = appointment.lastModified
-                }
             })
         })
         
-        //bepalen van lesuren (timeslot) voor exams zonder lesuur maar met start en eindtijd        
+        //bepalen van lesuren (timeslot) voor afspraken zonder lesuur maar met start en eindtijd        
         let timeslots = this.connector.getTodayTimeSlots()
         timeslots.sort((a,b)=> a.startDt - b.startDt)
         
         Object.values(modified_appointments).forEach(appointment=>{
-            if (appointment.type === "exam" && appointment.startTimeSlot === null) {
+            if (appointment.startTimeSlot == null || appointment.endTimeSlot == null) {
 
                 let startTime = new Date(appointment.start * 1000).getHours() + ":" + ("00" + new Date(appointment.start * 1000).getMinutes()).slice(-2)
                 let endTime = new Date(appointment.end * 1000).getHours() + ":" + ("00" + new Date(appointment.end * 1000).getMinutes()).slice(-2)
@@ -228,8 +224,13 @@ class Changes {
         let modified_objects_object = {}
         modified_appointments.forEach(app => modified_objects_object[app.id] = app)
 
-        Object.assign(this.#appointments, modified_objects_object)
-        return modified_appointments
+        let loaded = JSON.stringify(modified_appointments.sort((a,b)=> a.id - b.id))
+        let changed = loaded !== this.#lastLoaded
+        this.#lastLoaded = loaded
+        this.#appointments = modified_objects_object
+        //TODO: remove this
+        window.ad = this.#appointments
+        return changed
     }
 
 }

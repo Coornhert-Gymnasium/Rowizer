@@ -23,20 +23,15 @@ export default class ZermeloConnector extends connector {
 
     #isReady;
     #loadingPromise;
+    #loadError;
 
-    constructor(zapi, date = new Date().toLocaleString("nl-NL", {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-    }), options = {}){
+    constructor(zapi, date, options = {}){
         super(options);
         this.#isReady = false;
         this.api = zapi
-        this.#ignoreDepartmentCodes = options.ignore_departments
+        this.#ignoreDepartmentCodes = options.ignore_departments || []
 
-        let date_parts = date.split("-");
-        let date_obj = new Date(date_parts[2], date_parts[1] - 1, date_parts[0], 0, 0)
-        this.setDate(date_obj)
+        this.setDate(ZermeloConnector.#parseDate(date))
 
         this.#timeslotNames = []
         this.#timeslots = []
@@ -50,7 +45,7 @@ export default class ZermeloConnector extends connector {
                 this.#branch = branches[0]
                 this.#reloadBranchOfSchools()
 
-            })
+            }).catch(e=>this.#setLoadError(e))
         }
         else{
             this.api.branches.get({code:options.branch}).then(branches=>{
@@ -63,7 +58,7 @@ export default class ZermeloConnector extends connector {
                 this.#branch = branches[0]
                 this.#reloadBranchOfSchools()
 
-            })
+            }).catch(e=>this.#setLoadError(e))
         }
 
 
@@ -73,8 +68,33 @@ export default class ZermeloConnector extends connector {
 
     }
 
+    /**
+     * @param date string with format DD-MM-YYYY, today if empty or invalid
+     */
+    static #parseDate(date){
+        if(date){
+            let date_parts = date.split("-");
+            let date_obj = new Date(date_parts[2], date_parts[1] - 1, date_parts[0], 0, 0)
+            if(!isNaN(date_obj.getTime())){
+                return date_obj
+            }
+            console.warn("Invalid date '" + date + "', showing today")
+        }
+        let today = new Date()
+        today.setHours(0, 0, 0, 0)
+        return today
+    }
+
+    #setLoadError(error){
+        console.error(error)
+        this.#loadError = error
+    }
+
     get isReady(){
         return this.#isReady
+    }
+    get loadError(){
+        return this.#loadError
     }
     get groupsInDepartment(){
         return this.#groupsInDepartment
@@ -125,6 +145,7 @@ export default class ZermeloConnector extends connector {
 
     async #reloadBranchOfSchools() {
         this.#isReady = false;
+        this.#loadError = undefined;
         this.#loadingPromise = new Promise((resolve,reject)=>{
             (async () => {
                 this.#yearsOfEducation = {}
@@ -164,13 +185,18 @@ export default class ZermeloConnector extends connector {
                 })
 
                 Object.values(this.#groupsInDepartment).forEach(group => {
-                    if (group.isMainGroup) {
-                        this.#departments[group.departmentOfBranch].mainGroupsInDepartment.push(group.id)
-                    }
                     if (group.isMentorGroup) {
                         group.students = []
                     }
-                    this.#departments[group.departmentOfBranch].groupsInDepartment.push(group.id)
+                    let department = this.#departments[group.departmentOfBranch]
+                    if (!department) {
+                        console.warn("Group " + group.id + " has unknown department " + group.departmentOfBranch)
+                        return
+                    }
+                    if (group.isMainGroup) {
+                        department.mainGroupsInDepartment.push(group.id)
+                    }
+                    department.groupsInDepartment.push(group.id)
                 })
 
 
@@ -180,8 +206,10 @@ export default class ZermeloConnector extends connector {
                 })
 
                 Object.values(this.#studentsInDepartments).forEach(student => {
-                    if (student.mentorGroup) {
-                        this.#groupsInDepartment[student.mentorGroup].students.push(student.student)
+                    // de mentorgroep kan bij een andere vestiging horen
+                    let mentor_group = this.#groupsInDepartment[student.mentorGroup]
+                    if (mentor_group && mentor_group.students) {
+                        mentor_group.students.push(student.student)
                     }
                 })
                 while (this.#timeslotNames.length > 0) {
@@ -196,12 +224,15 @@ export default class ZermeloConnector extends connector {
                     timeslot.timeSlotName = this.#timeslotNames[timeslot.timeSlotName]
                 })
 
-                this.#realizedWeekTimeTables = await this.api.realizedweektimetables.get({schoolInSchoolYear: this.#branchOfSchool.schoolInSchoolYear, week:this.#date.getFullYear().toString() + this.#date.getPaddedWeekNumber()})
+                this.#realizedWeekTimeTables = await this.api.realizedweektimetables.get({schoolInSchoolYear: this.#branchOfSchool.schoolInSchoolYear, week:this.#date.getYearWeek()})
                 this.#dayTimeTables = await this.api.daytimetables.get({schoolInSchoolYear: this.#branchOfSchool.schoolInSchoolYear})
 
                 this.#isReady = true
                 resolve();
-            })()
+            })().catch(e=>{
+                this.#setLoadError(e)
+                reject(e)
+            })
         })
     }
 
@@ -213,7 +244,7 @@ export default class ZermeloConnector extends connector {
         //FIXME: multiple departmensOfBranch can have different timetables
 
         let week_table = Object.values(this.#realizedWeekTimeTables)[0]
-        let realized_table = week_table && this.#dayTimeTables[week_table[this.#date.toLocaleDateString("en-EN", { weekday: 'long' }).toLowerCase()]]
+        let realized_table = week_table && this.#dayTimeTables[week_table[["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][this.#date.getDay()]]]
         if(!realized_table){
             // geen rooster voor deze dag (bv. weekend)
             return []
@@ -243,17 +274,17 @@ export default class ZermeloConnector extends connector {
      * @return {Promise<unknown>}
      */
     waitUntilReady() {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             if (this.#isReady) {
                 resolve(this);
             } else if (this.#loadingPromise) {
-                this.#loadingPromise.then(a => resolve(a))
+                this.#loadingPromise.then(a => resolve(a), reject)
             } else {
 
                 let newt = function (resolve, obj) {
                     setTimeout(() => {
                         if (obj.#loadingPromise) {
-                            obj.#loadingPromise.then(()=>resolve(obj))
+                            obj.#loadingPromise.then(()=>resolve(obj), reject)
                         } else {
                             newt(resolve, obj)
                         }

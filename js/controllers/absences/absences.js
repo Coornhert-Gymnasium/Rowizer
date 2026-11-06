@@ -1,7 +1,4 @@
-import AbsenceEntity from "./absenceEntity.js";
-
 export default class Absences {
-    #lastModified;
     #absences;
     #lastValidAbsences;
 
@@ -9,87 +6,72 @@ export default class Absences {
         this.connector = connector
         this.#absences = {}
         this.#lastValidAbsences = ""
-
-        this.#lastModified = 0;
-
     }
     get absences(){
         return this.#absences
     }
     reset(){
-        this.#lastModified = 0;
         this.#absences = {};
+        this.#lastValidAbsences = ""
     }
 
+    /**
+     * @return {Promise<boolean>} true if the absences changed since the last time
+     */
     async loadAll(){
         if(!this.connector.date.isWeekDay()){
-            return []
+            return false
         }
-        let weeknumber = this.connector.date.getWeekNumber().toString()
-        if(weeknumber.length < 2){
-            weeknumber = "0"+weeknumber
-        }
-        let weekyear = this.connector.date.getFullYear().toString()+weeknumber
-        let headers = new Headers();
-        //headers.append("If-Modified-Since", new Date(this.#lastModified*1000).toUTCString())
+        let weekyear = this.connector.date.getYearWeek()
         let absences = await this.connector.api.employeeAbsences.get({
             branchOfSchool: this.connector.branch.id,
             startWeek: weekyear,
             endWeek: weekyear,
             fields: ["id","start","end","absenceType","employee","absenceTypeCode","lastModified"]
-        },{
-            headers: headers
         })
 
         let start = this.connector.date.getStartOfDayTime()/1000
         let end = this.connector.date.getEndOfDayTime()/1000
 
-        //FIXME: if-modified-since doenst work. Bear in mind: removed absences should also be noticed
-
+        // Altijd alles ophalen en vergelijken: zo vallen ook verwijderde afwezigheden op.
         let valid_absences= Object.values(absences).filter(abs=> abs.start < end && abs.end > start)
-        let absencesToCheck = JSON.stringify(valid_absences.sort((a,b)=> a.id < b.id))
+        let absencesToCheck = JSON.stringify(valid_absences.sort((a,b)=> a.id - b.id))
         if(this.#lastValidAbsences === absencesToCheck){
-            return []
+            return false
         }
-        else{
-            this.#lastValidAbsences = absencesToCheck
-        }
-
-        //let modified_absences = valid_absences.filter(abs=>abs.lastModified>this.#lastModified)
-
-        Object.values(absences).forEach(absence =>{
-            if(absence.lastModified > this.#lastModified){
-                this.#lastModified = absence.lastModified
-            }
-        })
 
         let timeslots = this.connector.getTodayTimeSlots()
-
+        let new_absences = {}
 
         valid_absences.forEach(abs=>{
-            this.#absences[abs.id] = new AbsenceEntity(abs)
-            if(abs.start > timeslots[0].startDt.getTime()/1000){
-               abs.startSlot = timeslots.find(slot=> abs.start <= slot.startDt.getTime()/1000)
-                //console.log("starts after first hour", abs.startSlot, new Date(abs.start*1000))
-            }
-            if(abs.end < timeslots.at(-1).endDt.getTime()/1000){
-                let endSlot = timeslots.find((slot, index, slots)=> {
-                    let to_return = abs.end <= slot.endDt.getTime()/1000
-                    if(!to_return){
-                        to_return = slots[index+1] ? slots[index+1].startDt.getTime()/1000 >= abs.end : false
-                    }
-                    return to_return
-                })
-                if(endSlot !== timeslots.at(-1)){
-                    //if absence ends during the last timeslot assume until end of day
-                    abs.endSlot = endSlot
+            // op een dag zonder rooster zijn er geen lesuren om de afwezigheid aan te koppelen
+            if(timeslots.length){
+                if(abs.start > timeslots[0].startDt.getTime()/1000){
+                   abs.startSlot = timeslots.find(slot=> abs.start <= slot.startDt.getTime()/1000)
+                    //console.log("starts after first hour", abs.startSlot, new Date(abs.start*1000))
                 }
+                if(abs.end < timeslots.at(-1).endDt.getTime()/1000){
+                    let endSlot = timeslots.find((slot, index, slots)=> {
+                        let to_return = abs.end <= slot.endDt.getTime()/1000
+                        if(!to_return){
+                            to_return = slots[index+1] ? slots[index+1].startDt.getTime()/1000 >= abs.end : false
+                        }
+                        return to_return
+                    })
+                    if(endSlot !== timeslots.at(-1)){
+                        //if absence ends during the last timeslot assume until end of day
+                        abs.endSlot = endSlot
+                    }
 
+                }
             }
 
-            valid_absences.forEach(abs=>this.#absences[abs.id] = abs)
+            new_absences[abs.id] = abs
         })
-        return valid_absences
+
+        this.#absences = new_absences
+        this.#lastValidAbsences = absencesToCheck
+        return true
     }
 
 }

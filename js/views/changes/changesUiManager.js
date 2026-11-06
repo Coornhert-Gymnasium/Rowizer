@@ -24,7 +24,7 @@ export class ChangesUiManager {
         let container = document.createElement('div')
         container.classList.add("schedule-container", "schedule-flex")
         container.style.setProperty('--years-of-education', yearsOfEducation.at(-1));
-        container.style.setProperty('--timeslots', timeslots.at(-1).rank);
+        container.style.setProperty('--timeslots', timeslots.length ? timeslots.at(-1).rank : 1);
         //set css variables
         let year_row = document.createElement('div')
         year_row.classList.add("year-row", "schedule-flex", "header")
@@ -76,11 +76,7 @@ export class ChangesUiManager {
         let do_app = function (apps, cm) {
             apps.forEach(appointment => {
                 try {
-                
-                    if (appointment.id === 1316992) {
-                        debugger;
-                    }
-                    if(appointment.groupsInDepartments.length != 0){
+                                    if(appointment.groupsInDepartments.length != 0){
                         appointment.groupsInDepartments.forEach(group_id => {
 
                             let group = cm.connector.getGroupInDepartment(group_id)
@@ -206,19 +202,22 @@ export class ChangesUiManager {
         })
     }
 
+    /**
+     * @return {Promise<boolean>} false if the data could not be loaded or shown
+     */
     async refreshTable() {
         //TODO: this is quick n dirty way to show the new changes
 
         try{
-            var changes = await this.changesManager.loadData()
+            var changed = await this.changesManager.loadData()
         }
         catch (e){
             console.error(e)
-            return;
+            return false;
 
         }
         // Na een mislukte eerste keer moet de tabel ook opgebouwd worden als er niets gewijzigd is.
-        if (!this.tableReady || Object.keys(changes).length) {
+        if (!this.tableReady || changed) {
             this.tableReady = false
             try {
                 this.scroller.stop()
@@ -229,49 +228,55 @@ export class ChangesUiManager {
             }
             catch (e){
                 console.error(e)
+                return false
             }
         }
-
+        return true
     }
 }
 
 class ChangesUIScroller{
-    constructor() {
-        this.largest = 0
-        this.timeout = undefined;
-    }
+    #timeout;
+    #frame;
 
     start(){
-        this.reset()
-        let animate = function(largest){
-            let duration = (largest.scrollHeight - largest.clientHeight)*150
-            $(".schedule-content").animate({scrollTop: largest.scrollHeight - largest.clientHeight}, {duration: duration}).promise().then(()=>
-                {
-                    setTimeout(()=>{
-
-                        $(".schedule-content").animate({scrollTop: 0}, {duration: 300}).promise().done(()=>animate(largest))
-
-                    },1000)
-                }
-            );
-
-        }
-        animate(this.largest);
+        this.stop()
+        this.#scrollDown()
     }
 
     stop(){
-        $(".schedule-content").stop()
+        clearTimeout(this.#timeout)
+        cancelAnimationFrame(this.#frame)
     }
 
-    reset(){
-        this.largest = undefined;
-        $(".schedule-content").each((index, el) => {
-            if(this.largest === undefined){
-                this.largest = el
+    #scrollDown(){
+        // Elke ronde opnieuw meten: de rij met de meeste inhoud bepaalt hoe ver alle rijen meescrollen.
+        let rows = [...document.querySelectorAll(".schedule-content")]
+        let overflow = Math.max(0, ...rows.map(row => row.scrollHeight - row.clientHeight))
+        if(overflow <= 0){
+            this.#timeout = setTimeout(() => this.#scrollDown(), 1000)
+            return
+        }
+        this.#animate(rows, 0, overflow, overflow*150, () => {
+            this.#timeout = setTimeout(() => {
+                this.#animate(rows, overflow, 0, 300, () => this.#scrollDown())
+            }, 1000)
+        })
+    }
+
+    #animate(rows, from, to, duration, done){
+        let started
+        let step = now => {
+            started = started ?? now
+            let progress = Math.min((now - started)/duration, 1)
+            rows.forEach(row => row.scrollTop = from + (to - from)*progress)
+            if(progress < 1){
+                this.#frame = requestAnimationFrame(step)
             }
-            else if (this.largest.scrollHeight < el.scrollHeight) {
-                this.largest = el.scrollHeight
+            else{
+                done()
             }
-        });
+        }
+        this.#frame = requestAnimationFrame(step)
     }
 }

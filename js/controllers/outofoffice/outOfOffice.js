@@ -9,7 +9,7 @@ export default class OutOfOffice {
 
     constructor(connector, options={}) {
         this.connector = connector
-        this.#outOfOffices = {}
+        this.#outOfOffices = []
 
         this.#lastModified = 0;
 

@@ -1,10 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <base target="_top">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
-    <link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.css" rel="stylesheet">
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="icon" href="data:,">
+    <script>
+        // Herlaad alleen als de site bereikbaar is: zonder netwerk zou het scherm blijven hangen op de foutpagina van de browser.
+        window.rowizerReload = function () {
+            fetch(location.href, {method: "HEAD", cache: "no-store"}).then(function (response) {
+                if (response.status < 500) {
+                    location.reload()
+                }
+            }).catch(function (e) {
+                console.warn("Site not reachable, not reloading", e)
+            })
+        }
+        // Als de scripts niet geladen konden worden start de app nooit: probeer het dan opnieuw.
+        setInterval(function () {
+            if (!window.rowizerStarted) {
+                window.rowizerReload()
+            }
+        }, 60 * 1000)
+    </script>
     <script src="js/script.js" type="module"></script>
     <script src="js/clock.js" type="module"></script>
 <!--    <script src='//unpkg.com/swagger-client' type='text/javascript'></script>-->
@@ -20,6 +37,7 @@
 <div class="flex" id="wrapper">
     <div class="flex flex-fill">
         <div class="flex" id="title"></div>
+        <div class="flex" id="status" style="display:none;"></div>
         <div class="flex" id="clock">0:00:00</div>
     </div>
     <div style="display:none;" class="flex padding-standard content-background"  id="absences-container">
