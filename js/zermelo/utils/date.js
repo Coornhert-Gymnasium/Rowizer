@@ -16,6 +16,18 @@ Date.prototype.getPaddedWeekNumber = function(){
     return d
 }
 
+// Het jaar waar de week bij hoort: 30-12-2024 valt in week 1 van 2025, 1-1-2027 in week 53 van 2026.
+Date.prototype.getWeekYear = function(){
+    var d = new Date(Date.UTC(this.getFullYear(), this.getMonth(), this.getDate()));
+    var dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    return d.getUTCFullYear()
+};
+
+Date.prototype.getYearWeek = function(){
+    return this.getWeekYear().toString() + this.getPaddedWeekNumber()
+}
+
 Date.prototype.getSchoolYear = function(){
     return this.getMonth() < 7 ? this.getFullYear() - 1 : this.getFullYear()
 };

@@ -179,4 +179,7 @@ div.appointment.activity.cancelled{
     display: inline;
 }
 
-
+#status {
+    color: rgb(255,200,60);
+    padding: 0 1em;
+}
