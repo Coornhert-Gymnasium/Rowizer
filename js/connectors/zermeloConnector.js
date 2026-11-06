@@ -218,7 +218,14 @@ export default class ZermeloConnector extends connector {
             // geen rooster voor deze dag (bv. weekend)
             return []
         }
-        return realized_table.timeSlots.map(slot_id=> {
+        return (realized_table.timeSlots || []).filter(slot_id=> {
+            let slot = this.#timeslots[slot_id]
+            if(!slot || !slot.timeSlotName || !slot.start || !slot.end){
+                console.warn("Skipping timeslot with missing data: " + slot_id)
+                return false
+            }
+            return true
+        }).map(slot_id=> {
             let slot =  this.#timeslots[slot_id]
             slot.startDt = new Date(this.#date.getTime())
             slot.startDt.setHours(slot.start.slice(0,2), slot.start.slice(2,4), 0)

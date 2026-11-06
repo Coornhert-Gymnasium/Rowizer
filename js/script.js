@@ -77,14 +77,19 @@ $(document).ready(function () {
         }
     }, 60*1000)
 
+    // Zonder basisgegevens (bv. door een netwerkfout bij het opstarten) kan niets laden: probeer het opnieuw.
+    setInterval(()=> {
+        if(!connector.isReady){
+            location.reload()
+        }
+    }, 5*60*1000)
+
     connector.waitUntilReady().then(a=>{
-        changesManager.loadData().then(cm => {
-            changesUiManager.makeTable();
-            changesUiManager.fillTable();
-            setInterval(()=> {
-                changesUiManager.refreshTable();
-            }, 5*60*1000)
-        }).catch(console.error)
+        // Het verversen vangt zijn eigen fouten af, dus ook na een mislukte eerste keer blijft het doorgaan.
+        changesUiManager.refreshTable();
+        setInterval(()=> {
+            changesUiManager.refreshTable();
+        }, 5*60*1000)
         absencesUiManager.refresh().then(a=>{
             setInterval(()=>{
                 absencesUiManager.refresh();
@@ -100,23 +105,22 @@ $(document).ready(function () {
             }
         });
 
-        connector.waitUntilReady().then(a=> outofoffice.setExternalLocationName(param_external)).catch(err=>console.log(err))
-            .then(a=> outofoffice.loadAll())
-            .then(items=>{
-                if(outofoffice.outOfOffices.length){
-                    document.querySelector("#outofoffice-container").style.display = null
+        let external_location_known = false
+        let refreshOutOfOffice = async function(){
+            try {
+                if(!external_location_known){
+                    await outofoffice.setExternalLocationName(param_external)
+                    external_location_known = true
                 }
-                outOfOfficeUiManager.refresh()
-                setInterval(()=>{
-                    outOfOfficeUiManager.refresh();
-                    if(outofoffice.outOfOffices.length){
-                        document.querySelector("#outofoffice-container").style.display = null
-                    }
-                    else{
-                        document.querySelector("#outofoffice-container").style.display = "none"
-                    }
-                }, 5*60*1000)
-            })
+                await outOfOfficeUiManager.refresh()
+                document.querySelector("#outofoffice-container").style.display = outofoffice.outOfOffices.length ? null : "none"
+            }
+            catch(err){
+                console.error(err)
+            }
+        }
+        refreshOutOfOffice()
+        setInterval(refreshOutOfOffice, 5*60*1000)
 
 
     })

@@ -9,6 +9,7 @@ export class ChangesUiManager {
         this.connector = connector
         this.setDate(connector.date)
         this.scroller = new ChangesUIScroller()
+        this.tableReady = false
 
     }
 
@@ -155,7 +156,7 @@ export class ChangesUiManager {
                         console.log(appointment)
                     }
                 } catch (e) {
-                    // Eén afspraak met onverwachte gegevens mag nooit het hele bord leeg laten.
+                    // EÃ©n afspraak met onverwachte gegevens mag nooit het hele bord leeg laten.
                     console.warn("Skipping appointment " + appointment.id, e, appointment)
                 }
             })
@@ -216,12 +217,19 @@ export class ChangesUiManager {
             return;
 
         }
-        if (Object.keys(changes).length) {
-            this.scroller.stop()
-            this.element.innerHTML = ""
-            this.makeTable()
-            this.fillTable()
-
+        // Na een mislukte eerste keer moet de tabel ook opgebouwd worden als er niets gewijzigd is.
+        if (!this.tableReady || Object.keys(changes).length) {
+            this.tableReady = false
+            try {
+                this.scroller.stop()
+                this.element.innerHTML = ""
+                this.makeTable()
+                this.fillTable()
+                this.tableReady = true
+            }
+            catch (e){
+                console.error(e)
+            }
         }
 
     }
