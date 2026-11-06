@@ -15,8 +15,10 @@ export default class ChangesUIRecordClass extends ChangesUIRecord {
 
 
         if(this.appointment.type === "activity"){
-            str += this.appointment.subjects[0].replace("_", " ")
-            str += " "
+            if (this.appointment.subjects.length) {
+                str += this.appointment.subjects[0].replace("_", " ")
+                str += " "
+            }
 
         } else {
             if (this.entity.isMainGroup) {

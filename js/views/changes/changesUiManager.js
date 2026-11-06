@@ -123,10 +123,12 @@ export class ChangesUiManager {
                     depts.forEach(dept => {
                         let branch = cm.connector.getDepartmentOfBranch(dept)
                         // Maak een fake group, met naam uit "subject" van de afspraak, en extended name uit "remark" van de afspraak. 
-                        let remark = appointment.subjects[0].substring(0, 6)
-                        if (appointment.type === "exam") {
+                        // Niet elke afspraak heeft een vak: gebruik dan alleen de opmerking als naam.
+                        let subject = appointment.subjects[0]
+                        let remark = subject ? subject.substring(0, 6) : ""
+                        if (appointment.type === "exam" || !subject) {
                             // toetsen krijgen uitgebreide beschrijving:
-                            remark += " " + appointment.remark;
+                            remark = (remark + " " + (appointment.remark || "")).trim();
                         }
                         let group = {'id': appointment.id, 'departmentOfBranch': dept, 'name': remark, 'extendedName': remark, "isMainGroup": false, "isMentorGroup": false}
                         changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
