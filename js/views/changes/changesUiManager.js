@@ -319,6 +319,10 @@ export class ChangesUiManager {
      * vandaag toont; verandert alleen klassen, de tabel wordt niet opnieuw opgebouwd.
      */
     markTime(now = appNow()) {
+        // zonder basisgegevens geen lesuren; een bewaarde stand (plan stap R.16) houdt dan zijn markering
+        if (!this.connector.isReady) {
+            return
+        }
         let today = new Date(now)
         today.setHours(0, 0, 0, 0)
         let isToday = this.connector.date.getTime() === today.getTime()

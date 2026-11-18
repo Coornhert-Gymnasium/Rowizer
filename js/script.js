@@ -21,6 +21,7 @@ import {measureClockOffset, clockNote} from "./clockCheck.js";
 import diagnostics from "./diagnostics.js";
 import {parseWindow, isResting} from "./activeWindow.js";
 import {fetchVersion, shouldReload, triedStore} from "./versionCheck.js";
+import {storageWorks, saveBoard, loadBoard, sanitize} from "./boardCache.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -115,6 +116,38 @@ var absencesUiManager = new AbsencesUiManager(document.querySelector("#absences-
 var outofoffice = new OutOfOffice(connector)
 var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#outofoffice-inner-container"),connector,outofoffice)
 
+// Bewaarde stand van vandaag meteen tonen (plan stap R.16): bij een start zonder Zermelo is dat
+// beter dan een leeg bord. Komen er verse gegevens, dan vervangen die de bewaarde stand.
+let board_storage = local_storage && storageWorks(local_storage) ? local_storage : null
+let board_scope = params.get("portal") + "|" + (param_branch || "")
+let restored_at = null
+if(board_storage){
+    let cached = loadBoard(board_storage, {day: connector.date.toDateString(), scope: board_scope})
+    if(cached){
+        try {
+            document.querySelector("#content-container").replaceChildren(sanitize(cached.board))
+            absencesUiManager.element.replaceChildren(sanitize(cached.absences))
+            document.querySelector("#absences-container").style.display = absencesUiManager.element.children.length ? null : "none"
+            restored_at = cached.savedAt
+            console.info("Showing the saved board of " + new Date(cached.savedAt).toLocaleTimeString("nl-NL") + " until fresh data arrives")
+        } catch (e) {
+            console.warn("Could not show the saved board", e)
+        }
+    }
+}
+let saveShownBoard = function(){
+    if(!board_storage || !changesUiManager.tableReady || !connector.isCurrent){
+        return
+    }
+    saveBoard(board_storage, {
+        day: connector.date.toDateString(),
+        scope: board_scope,
+        savedAt: appNow(),
+        board: document.querySelector("#content-container").innerHTML,
+        absences: absencesUiManager.element.innerHTML,
+    })
+}
+
 // Hulpmiddelen in de console, alleen met debug=1 (plan stap 4.2)
 if(param_debug){
     window.cm = changesUiManager
@@ -138,6 +171,10 @@ let scheduler = new Scheduler({isResting: resting, onRound: task => {
     if(task.failures === 0 && window.rowizerReloadOk){
         window.rowizerReloadOk()
     }
+    // wat er nu staat bewaren voor een start zonder Zermelo (plan stap R.16)
+    if(task.failures === 0 && (task.name === "changes" || task.name === "absences")){
+        saveShownBoard()
+    }
     updateStatus()
 }})
 scheduler.listen()
@@ -159,6 +196,7 @@ let updateStatus = function(){
         absences: absences_allowed ? scheduler.task("absences") : undefined,
         clockOffset: clockOffset(),
         // alleen als de laatste ronde slaagde: een storing blijft ook in rusttijd zichtbaar
+        restoredAt: restored_at,
         resting: resting() && scheduler.task("changes")?.failures === 0 && !!scheduler.task("changes")?.lastSuccess,
     })
 
@@ -199,6 +237,7 @@ let showTitle = function(){
 let switchDay = async function(date){
     console.info("New day: " + date.toDateString())
     let loading = connector.switchDay(date)
+    restored_at = null
     showTitle()
     changesManager.reset()
     changesUiManager.showMessage("Rooster van " + date.toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"}) + " wordt geladen")
