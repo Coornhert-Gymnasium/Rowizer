@@ -182,6 +182,21 @@ div.appointment.activity.cancelled{
     display: inline;
 }
 
+/* lesdag zonder wijzigingen: melding midden in het lege raster */
+.schedule-container {
+    position: relative;
+}
+.board-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: rgb(240,240,240);
+    font-size: 2em;
+}
+
 .board-message {
     margin: auto;
     padding: 1em 2em;

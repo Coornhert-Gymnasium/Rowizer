@@ -226,6 +226,11 @@ connector.waitUntilReady().then(()=>{
         if(!absences_allowed){
             return true
         }
+        // dag zonder lessen: geen afwezigenregel (plan stap 1.5)
+        if(!connector.getTodayTimeSlots().length){
+            document.querySelector("#absences-container").style.display = "none"
+            return true
+        }
         try {
             let ok = await absencesUiManager.refresh()
             if(ok){

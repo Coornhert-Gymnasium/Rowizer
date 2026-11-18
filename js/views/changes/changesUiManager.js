@@ -2,6 +2,22 @@ import ChangesUIRecordClass from "./changesUIRecordClass.js";
 
 const TYPE_ORDER = {activity: 0, exam: 1, lesson: 2}
 
+export const NO_LESSONS_TEXT = "Vandaag geen lessen"
+export const NO_CHANGES_TEXT = "Geen roosterwijzigingen"
+
+/**
+ * Wat het bord toont als er niets is (plan stap 1.5).
+ * @param lessonsToday aantal lesuren vandaag
+ * @param itemCount aantal items op het bord
+ * @return {"no-lessons"|"no-changes"|null}
+ */
+export function emptyState(lessonsToday, itemCount) {
+    if (!lessonsToday) {
+        return "no-lessons"
+    }
+    return itemCount ? null : "no-changes"
+}
+
 /**
  * Eén volgorde voor de items op het bord (plan stap 1.7): activiteiten, toetsen, lessen; daarbinnen
  * op groepsnaam (h3 voor h10), dan op lesuur. Altijd dezelfde uitkomst, in elke browser.
@@ -93,6 +109,7 @@ export class ChangesUiManager {
      * @param table het raster, nog niet op de pagina
      */
     fillTable(table) {
+        let placed = 0
         this.collectChanges().forEach(change => {
             let container = table.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
             if (!container) {
@@ -101,11 +118,13 @@ export class ChangesUiManager {
             }
             try {
                 container.append(change.getElement())
+                placed++
             } catch (e) {
                 console.warn("Could not show appointment " + change.appointment.id, e, change.appointment)
             }
 
         })
+        return placed
     }
 
     /**
@@ -252,14 +271,29 @@ export class ChangesUiManager {
             // Eerst los opbouwen, dan in één keer plaatsen: een fout laat het vorige beeld staan
             // (plan stap R.9).
             let table
+            let state
             try {
                 table = this.makeTable()
-                this.fillTable(table)
+                state = emptyState(this.connector.getTodayTimeSlots().length, this.fillTable(table))
             }
             catch (e){
                 console.error("Could not draw the board, keeping the previous one", e)
                 this.lastFailure = "render"
                 return false
+            }
+            if (state === "no-lessons") {
+                // weekend of vrije dag: geen leeg raster
+                this.showMessage(NO_LESSONS_TEXT)
+                this.drawnSnapshot = snapshot
+                this.lastFailure = null
+                this.tableReady = true
+                return true
+            }
+            if (state === "no-changes") {
+                let message = document.createElement("div")
+                message.classList.add("board-empty")
+                message.textContent = NO_CHANGES_TEXT
+                table.append(message)
             }
             let scrolled = this.scroller.position()
             this.scroller.stop()
