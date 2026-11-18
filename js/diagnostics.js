@@ -26,6 +26,20 @@ export function countOutOfGrid() {
     diagnostics.outOfGrid++
 }
 
+const MAX_EVENTS = 50
+diagnostics.events = []
+
+/**
+ * Bewaart een fout of melding in een ringbuffer van 50 regels, voor het diagnosepaneel.
+ */
+export function logEvent(level, message) {
+    let line = new Date().toLocaleTimeString("nl-NL") + " " + level + " " + String(message).slice(0, 300)
+    diagnostics.events.push(line)
+    if (diagnostics.events.length > MAX_EVENTS) {
+        diagnostics.events.splice(0, diagnostics.events.length - MAX_EVENTS)
+    }
+}
+
 export function countDroppedRows(endpoint, count) {
     diagnostics.droppedRows[endpoint] = (diagnostics.droppedRows[endpoint] || 0) + count
 }

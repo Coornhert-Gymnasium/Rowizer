@@ -13,17 +13,22 @@ import DayRollover from "./dayRollover.js";
 import Scheduler from "./scheduler.js";
 import {computeStatus} from "./status.js";
 import {checkToken, tokenNote} from "./tokenCheck.js";
+import {readSettings} from "./settings.js";
+import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
 const STARTUP_TIMEOUT = 5*60*1000
 const MAINTENANCE_HOUR = 3
 
+installErrorHandlers()
 console.log("Rowizer loaded, version " + VERSION)
 //TODO: remove this
 //window.pretendLikeIts = 1717452000000/1000;
 
-let params = new URLSearchParams(window.location.search)
+// Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
+let params = readSettings(window.location)
+let param_debug = params.get("debug") === "1"
 
 //portal: naam vh portal, token: api-token, branch: branchcode (vestigingscode)
 
@@ -102,6 +107,10 @@ let updateStatus = function(){
     document.querySelector("#absences-note").textContent = status.absencesNote || ""
     if(status.absences === "hidden"){
         absences_container.style.display = "none"
+    }
+
+    if(param_debug){
+        showDebugPanel({scheduler, session: zapi.session, connector, version: VERSION})
     }
 }
 
