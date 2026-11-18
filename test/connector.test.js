@@ -2,7 +2,8 @@ import "./helpers/tz.js"
 import "./helpers/quiet.js"
 import test from "node:test"
 import assert from "node:assert/strict"
-import {buildBoard, boardLines} from "./helpers/board.js"
+import {buildBoard, boardLines, boardSnapshot} from "./helpers/board.js"
+import diagnostics from "../js/diagnostics.js"
 import {ZermeloApi} from "../js/zermelo/zermelo.js"
 import ZermeloConnector from "../js/connectors/zermeloConnector.js"
 import FakeSession, {loadFixtures} from "./helpers/fakeSession.js"
@@ -107,5 +108,42 @@ test("getTodayTimeSlots verandert de momentopname niet", async () => {
     let {connector} = await buildBoard()
     let slots = connector.getTodayTimeSlots()
     assert.ok(slots[0].startDt instanceof Date)
-    assert.equal(Object.values(connector.snapshot.timeslots).some(slot => "startDt" in slot), false)
+    let embedded = connector.snapshot.realizedWeekTimeTables.flatMap(row => row.timeSlotsWednesday || [])
+    assert.ok(embedded.length > 0)
+    assert.equal(embedded.some(slot => "startDt" in slot), false)
+})
+
+test("dagrooster: het rooster van de meeste afdelingen, onafhankelijk van de volgorde", async () => {
+    let {connector, lines} = await boardSnapshot("2026-09-23")
+    let slots = connector.getTodayTimeSlots()
+    assert.deepEqual(diagnostics.dayTables.counts, {"24": 9, "50002": 6})
+    assert.deepEqual(slots.map(s => s.timeSlotName.name).slice(0, 3), ["u01", "u02", "u03"])
+
+    let reversed = await boardSnapshot("2026-09-23", {
+        intercept: (endpoint, options, n) => endpoint === "realizedweektimetables"
+            ? loadFixtures("2026-09-23").data.realizedweektimetables.reverse()
+            : undefined
+    })
+    assert.deepEqual(reversed.connector.getTodayTimeSlots().map(s => s.start), slots.map(s => s.start))
+    assert.deepEqual(reversed.lines, lines)
+})
+
+test("dagrooster: rijen van andere vestigingen en genegeerde afdelingen tellen niet mee", async () => {
+    let {connector} = await buildBoard()
+    let departments = connector.departments
+    assert.ok(connector.snapshot.realizedWeekTimeTables.every(row => departments[row.departmentOfBranch]))
+    assert.equal(connector.snapshot.realizedWeekTimeTables.length, 15)
+})
+
+test("weekend: geen lesuren", async () => {
+    let {connector} = await buildBoard()
+    await connector.setDate(new Date(2026, 8, 26))
+    assert.deepEqual(connector.getTodayTimeSlots(), [])
+})
+
+test("lesuren komen uit de weekroosters: geen verzoeken naar timeslots of daytimetables", async () => {
+    let {session} = await buildBoard()
+    let endpoints = new Set(session.requests.map(r => r.endpoint))
+    assert.equal(endpoints.has("timeslots"), false)
+    assert.equal(endpoints.has("daytimetables"), false)
 })

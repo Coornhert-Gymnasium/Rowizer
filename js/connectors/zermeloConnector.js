@@ -1,4 +1,5 @@
 import {ZermeloError} from "../zermelo/utils/errors.js";
+import {setDayTables} from "../diagnostics.js";
 
 const STARTUP_RETRY_DELAY = 60*1000
 // Instellingen die niet kloppen (bv. schooljaar nog niet ingericht) lossen zich niet binnen een minuut op.
@@ -250,13 +251,14 @@ export default class ZermeloConnector {
         })
 
         let timeslotNames = await api.timeslotNames.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear})
-        let timeslots = await api.timeslots.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear})
-        Object.values(timeslots).forEach(timeslot => {
-            timeslot.timeSlotName = timeslotNames[timeslot.timeSlotName]
-        })
 
-        let realizedWeekTimeTables = await api.realizedweektimetables.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear, week: week})
-        let dayTimeTables = await api.daytimetables.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear})
+        // Eén rij per afdeling, met per dag de lesuren erin (code, start, end, rank); de aparte
+        // verzoeken naar timeslots en daytimetables zijn daardoor niet meer nodig (plan stap R.5).
+        let realizedWeekTimeTables = (await api.realizedweektimetables.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear, week: week}))
+            .filter(row => {
+                let department = departments[row.departmentOfBranch]
+                return department && !this.#options.ignoreDepartmentCodes.includes(department.code)
+            })
 
         return Object.freeze({
             loadedAt: Date.now(),
@@ -269,10 +271,70 @@ export default class ZermeloConnector {
             groupsInDepartment,
             studentsInDepartments,
             timeslotNames,
-            timeslots,
             realizedWeekTimeTables,
-            dayTimeTables,
         })
+    }
+
+    /**
+     * Het dagrooster van de getoonde dag: het rooster dat de meeste afdelingen gebruiken
+     * (besluit 8: het Coornhert heeft er één). Gebruiken afdelingen verschillende roosters, dan
+     * komt dat in de diagnose; op het scherm verandert niets.
+     * @return {{table: *, row: object|undefined, counts: object}}
+     */
+    #dayTable(){
+        let current = this.#current
+        let day = WEEKDAYS[this.#date.getDay()]
+        let counts = {}
+        let rowFor = {}
+        current.realizedWeekTimeTables.forEach(row => {
+            let table = row[day]
+            if(table === undefined || table === null){
+                return
+            }
+            counts[table] = (counts[table] || 0) + 1
+            rowFor[table] = rowFor[table] || row
+        })
+        let tables = Object.keys(counts)
+        let table = tables.sort((a, b) => counts[b] - counts[a] || Number(a) - Number(b))[0]
+        setDayTables(tables.length > 1 ? {date: this.#date.toDateString(), counts} : null)
+        return {table, row: table === undefined ? undefined : rowFor[table], day}
+    }
+
+    /**
+     * De lesuren van de getoonde dag voor een afdeling, met startDt en endDt.
+     * Nu geldt voor elke afdeling hetzelfde dagrooster (zie #dayTable); de parameter is er zodat
+     * een school met verschillende roosters dit later kan uitbreiden zonder de aanroepers te wijzigen.
+     * @param departmentId
+     * @return {object[]} kopieën; de momentopname blijft ongewijzigd
+     */
+    getTimeSlots(departmentId){
+        let current = this.#current
+        if(!current){
+            return []
+        }
+        let {row, day} = this.#dayTable()
+        if(!row){
+            // geen rooster voor deze dag (bv. weekend)
+            return []
+        }
+        let embedded = row["timeSlots" + day[0].toUpperCase() + day.slice(1)] || []
+        let names = Object.values(current.timeslotNames)
+
+        return embedded.filter(slot => {
+            if(!slot || !slot.start || !slot.end || !Number.isFinite(slot.rank)){
+                console.warn("Skipping timeslot with missing data: " + JSON.stringify(slot))
+                return false
+            }
+            return true
+        }).map(slot => {
+            let name = names.find(n => n.rank === slot.rank && (!slot.code || n.code === slot.code)) || {rank: slot.rank, name: slot.code, code: slot.code}
+            let result = {id: slot.id, start: slot.start, end: slot.end, timeSlotName: name}
+            result.startDt = new Date(this.#date.getTime())
+            result.startDt.setHours(slot.start.slice(0,2), slot.start.slice(2,4), 0)
+            result.endDt = new Date(this.#date.getTime())
+            result.endDt.setHours(slot.end.slice(0,2), slot.end.slice(2,4), 0)
+            return result
+        }).sort((a,b) => a.timeSlotName.rank - b.timeSlotName.rank)
     }
 
     /**
@@ -280,38 +342,7 @@ export default class ZermeloConnector {
      * @return {*}
      */
     getTodayTimeSlots(){
-        //FIXME: multiple departmensOfBranch can have different timetables
-        let current = this.#current
-        if(!current){
-            return []
-        }
-
-        let week_table = Object.values(current.realizedWeekTimeTables)[0]
-        let realized_table = week_table && current.dayTimeTables[week_table[WEEKDAYS[this.#date.getDay()]]]
-        if(!realized_table){
-            // geen rooster voor deze dag (bv. weekend)
-            return []
-        }
-        return (realized_table.timeSlots || []).filter(slot_id=> {
-            let slot = current.timeslots[slot_id]
-            if(!slot || !slot.timeSlotName || !slot.start || !slot.end){
-                console.warn("Skipping timeslot with missing data: " + slot_id)
-                return false
-            }
-            return true
-        }).map(slot_id=> {
-            // een kopie: de momentopname zelf blijft ongewijzigd
-            let slot = {...current.timeslots[slot_id]}
-            slot.startDt = new Date(this.#date.getTime())
-            slot.startDt.setHours(slot.start.slice(0,2), slot.start.slice(2,4), 0)
-            slot.endDt = new Date(this.#date.getTime())
-            slot.endDt.setHours(slot.end.slice(0,2), slot.end.slice(2,4), 0)
-
-            return slot
-
-        }).sort((a,b) => a.timeSlotName.rank - b.timeSlotName.rank)
-
-
+        return this.getTimeSlots()
     }
     /**
      * Wacht tot de eerste momentopname er is. Wordt nooit afgewezen: het opstarten blijft

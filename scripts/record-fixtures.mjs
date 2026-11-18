@@ -93,9 +93,7 @@ const fixtures = {
         fields: ["student", "departmentOfBranch", "mentorGroup"]
     }),
     timeslotnames: await get("timeslotnames", {schoolInSchoolYear: scope.schoolInSchoolYear}),
-    timeslots: await get("timeslots", {schoolInSchoolYear: scope.schoolInSchoolYear}),
     realizedweektimetables: await get("realizedweektimetables", {schoolInSchoolYear: scope.schoolInSchoolYear, week}),
-    daytimetables: await get("daytimetables", {schoolInSchoolYear: scope.schoolInSchoolYear}),
     employeeabsences: await get("employeeabsences", {
         branchOfSchool: scope.branchOfSchool, startWeek: week, endWeek: week,
         fields: ["id", "start", "end", "absenceType", "employee", "absenceTypeCode", "lastModified"]

@@ -11,6 +11,17 @@ const diagnostics = {
     outOfGrid: 0,
 }
 
+/**
+ * @param info null, of {date, counts: {dagrooster-id: aantal afdelingen}} als afdelingen
+ *        die dag verschillende dagroosters gebruiken
+ */
+export function setDayTables(info) {
+    if (info && JSON.stringify(info) !== JSON.stringify(diagnostics.dayTables)) {
+        console.warn("Departments use different day timetables on " + info.date + ": " + JSON.stringify(info.counts) + ", showing the most common one")
+    }
+    diagnostics.dayTables = info
+}
+
 export function countOutOfGrid() {
     diagnostics.outOfGrid++
 }
