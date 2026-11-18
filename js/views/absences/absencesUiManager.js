@@ -41,7 +41,7 @@ export class AbsencesUiManager {
             }
             return true
         } catch(e){
-            if(e instanceof ZermeloAuthorizationError){
+            if(e instanceof ZermeloAuthorizationError && e.kind === "permission"){
                 throw e
             }
             console.error(e)

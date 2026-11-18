@@ -134,7 +134,8 @@ connector.waitUntilReady().then(a=>{
             return ok
         }
         catch(err){
-            if(err instanceof ZermeloAuthorizationError){
+            // Alleen een ontbrekend recht zet de afwezigen uit; een verlopen token (auth) niet.
+            if(err instanceof ZermeloAuthorizationError && err.kind === "permission"){
                 console.log("No authorization for absences")
                 absences_allowed = false
                 return true
