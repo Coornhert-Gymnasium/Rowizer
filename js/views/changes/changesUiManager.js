@@ -20,6 +20,37 @@ export function emptyState(lessonsToday, itemCount) {
 }
 
 /**
+ * De kolommen van het raster (plan stap 2.2): de lesuren van vandaag, zonder lege kolommen aan
+ * het eind van de dag (nooit in het midden). Zonder lesuren van vandaag (bv. ontbrekend
+ * weekrooster): alle lesuurnamen van het schooljaar, zoals eerder.
+ * @param todaySlots connector.getTodayTimeSlots()
+ * @param yearNames connector.timeslots (lesuurnamen van het schooljaar)
+ * @param lastUsedRank hoogste lesuur met een item, of null als er geen items zijn
+ * @return {{rank: number, name: string}[]} oplopend op rangnummer
+ */
+export function boardColumns(todaySlots, yearNames, lastUsedRank = null) {
+    let columns = todaySlots.length
+        ? todaySlots.map(slot => ({rank: slot.timeSlotName.rank, name: slot.timeSlotName.name || slot.timeSlotName.code}))
+        : Object.values(yearNames || {}).map(name => ({rank: name.rank, name: name.name}))
+    columns = columns.filter(c => Number.isFinite(c.rank)).sort((a, b) => a.rank - b.rank)
+    if (lastUsedRank !== null) {
+        let kept = columns.filter(c => c.rank <= lastUsedRank)
+        if (kept.length) {
+            columns = kept
+        }
+    }
+    return columns.length ? columns : [{rank: 1, name: ""}]
+}
+
+/**
+ * De kolom (1, 2, ...) van een lesuur. Werkt ook als de rangnummers niet bij 1 beginnen
+ * (een nulde uur) of een gat hebben; een lesuur buiten het raster komt in de dichtstbijzijnde kolom.
+ */
+export function columnOf(columns, rank) {
+    return Math.min(Math.max(1, columns.filter(c => c.rank <= rank).length), columns.length)
+}
+
+/**
  * Eén volgorde voor de items op het bord (plan stap 1.7): activiteiten, toetsen, lessen; daarbinnen
  * op groepsnaam (h3 voor h10), dan op lesuur. Altijd dezelfde uitkomst, in elke browser.
  */
@@ -56,14 +87,14 @@ export class ChangesUiManager {
      * Bouwt het lege raster, los van de pagina.
      * @return {HTMLElement}
      */
-    makeTable() {
+    makeTable(columns = boardColumns(this.connector.getTodayTimeSlots(), this.connector.timeslots)) {
         let yearsOfEducation = Object.keys(this.connector.yearsOfEducation).sort()
-        let timeslots = Object.values(this.connector.timeslots).sort((a, b) => a.rank - b.rank)
+        let timeslots = columns
 
         let container = document.createElement('div')
         container.classList.add("schedule-container", "schedule-flex")
         container.style.setProperty('--years-of-education', yearsOfEducation.at(-1));
-        container.style.setProperty('--timeslots', timeslots.length ? timeslots.at(-1).rank : 1);
+        container.style.setProperty('--timeslots', timeslots.length);
         //set css variables
         let year_row = document.createElement('div')
         year_row.classList.add("year-row", "schedule-flex", "header")
@@ -109,9 +140,12 @@ export class ChangesUiManager {
      * Zet de items in het raster van makeTable().
      * @param table het raster, nog niet op de pagina
      */
-    fillTable(table) {
+    fillTable(table, changes = this.collectChanges(), columns = boardColumns(this.connector.getTodayTimeSlots(), this.connector.timeslots)) {
         let placed = 0
-        this.collectChanges().forEach(change => {
+        changes.forEach(change => {
+            // lesuur -> kolom (plan stap 2.2)
+            change.columnStart = columnOf(columns, change.period_start)
+            change.columnEnd = Math.max(change.columnStart, columnOf(columns, change.period_end))
             let container = table.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
             if (!container) {
                 // geen rij voor deze jaarlaag, bv. een genegeerde afdeling of een afdeling zonder leerjaar
@@ -274,8 +308,13 @@ export class ChangesUiManager {
             let table
             let state
             try {
-                table = this.makeTable()
-                state = emptyState(this.connector.getTodayTimeSlots().length, this.fillTable(table))
+                let changes = this.collectChanges()
+                let years = this.connector.yearsOfEducation
+                let shown = changes.filter(c => c.departmentOfBranch.yearOfEducation in years)
+                let lastUsed = shown.length ? Math.max(...shown.map(c => c.period_end)) : null
+                let columns = boardColumns(this.connector.getTodayTimeSlots(), this.connector.timeslots, lastUsed)
+                table = this.makeTable(columns)
+                state = emptyState(this.connector.getTodayTimeSlots().length, this.fillTable(table, changes, columns))
             }
             catch (e){
                 console.error("Could not draw the board, keeping the previous one", e)

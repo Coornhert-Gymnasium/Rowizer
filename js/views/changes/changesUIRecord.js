@@ -44,8 +44,9 @@ export class ChangesUIRecord {
         el.classList.add(...this.getClassNames())
 
         //for activities use real times
-        el.style.setProperty('--start-hour', this.period_start);
-        el.style.setProperty('--end-hour', this.period_end);
+        // kolommen uit ChangesUiManager.fillTable (plan stap 2.2), anders het lesuur zelf
+        el.style.setProperty('--start-hour', this.columnStart ?? this.period_start);
+        el.style.setProperty('--end-hour', this.columnEnd ?? this.period_end);
         el.setAttribute('data-appointment-id', this.appointment.id);
         el.innerText = this.getInnerText()
 
