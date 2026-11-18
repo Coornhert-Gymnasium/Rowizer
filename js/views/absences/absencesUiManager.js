@@ -12,8 +12,7 @@ export class AbsencesUiManager {
 
     render() {
         // Eén regel per docent, met de lesuren als bereik (plan stap 1.1).
-        let ranks = this.connector.getTodayTimeSlots().map(slot => slot.timeSlotName.rank)
-        let merged = mergeAbsences(Object.values(this.absencesManager.absences), ranks)
+        let merged = mergeAbsences(Object.values(this.absencesManager.absences), this.connector.getTodayTimeSlots())
 
         // eerst alles opbouwen, dan in één keer plaatsen: een fout laat de vorige lijst staan
         let elements = merged.map(item => {
