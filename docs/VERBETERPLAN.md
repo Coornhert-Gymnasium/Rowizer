@@ -641,3 +641,22 @@ zoals hier besloten.
 | 8 | Dagroosters per afdeling (R.5) | Het Coornhert gebruikt er geen verschillende | R.5 in de eenvoudige vorm: één dagrooster, met een waarschuwing in de diagnose als er meer blijken te zijn |
 | 9 | Meldingen op het scherm (R.10) | Neutrale tekst op het scherm, technische details alleen in het diagnosepaneel | Teksten in R.10 en R.12 aangepast |
 | 10 | Zermelo-limieten | Zermelo hanteert geen verzoeklimiet per token. De app houdt zichzelf aan een eigen budget: 100 verzoeken per 10 minuten en 2500 per etmaal, per scherm | Budget en retrybeleid uit R.3 uitvoeren. Eerst 60 per 10 minuten; bij het testen op 18-11-2026 verhoogd naar 100, omdat twee keer verversen plus een paar extra rondes (elk opstarten ~20 verzoeken inclusief herhalingen) het bord minutenlang leeg liet |
+
+## 7. Stand van uitvoering
+
+Bijgewerkt op 18-11-2026. Alles staat in PR's naar `master` van `tomkooij/Rowizer`: #4 (fase 0,
+R en 1, gemerged), #5 (herstel `overflow-x`, gemerged), #6 (fase 2), #7 (fase 3) en de PR van
+`plan/fase-4-opruimen` (fase 4, R.16, R.17 en de rest).
+
+| Stap | Stand |
+|---|---|
+| 0.1 – 0.4, R.1 – R.14, 1.1 – 1.7 | Gedaan |
+| R.6 | Klokcontrole gedaan. Rekenen in een vaste tijdzone niet (besluit 7, 32 plekken in de code); wel een melding `tijdzone <zone>` als het scherm een andere tijd geeft dan Europe/Amsterdam |
+| R.15 | Overgeslagen. Op de demo-portal geeft `modifiedSince` alleen recent gewijzigde afspraken (3 van 496), maar of uitval en verwijderen erin komen, is alleen te zien door op een portal afspraken te wijzigen; dat is niet gedaan. Kan later op een eigen testportal |
+| R.16, R.17 | Gedaan; zie S16 en S17 in `docs/STORINGSTEST.md` |
+| 2.1 – 2.6 | Gedaan |
+| 3.1 | Vervalt (besluit 1): 3.3 heeft de ongeldige afspraken nodig |
+| 3.2, 3.3, 3.5, 3.6 | Gedaan; bij 3.2 ook de vakanties uit §5. Afwijking bij 3.5: de nachtelijke herlading blijft, als dagelijkse schone start |
+| 3.4 | Vervalt (besluit 2) |
+| 4.1 – 4.4 | Gedaan; ongebruikte managers blijven staan (besluit 5) |
+| S1 – S17 | Zie `docs/STORINGSTEST.md`; alleen S15 (72 uur) moet nog op een echte Pi |
