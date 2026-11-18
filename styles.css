@@ -3,6 +3,8 @@ body {
     font-weight: bold;
     background: linear-gradient(45deg, #49a09d, #5f2c82);
     height: calc(100% - 10px);
+    /* scherm in de hal: geen muisaanwijzer */
+    cursor: none;
 }
 html{
     height: 100%
@@ -34,11 +36,6 @@ html{
 #content-container{
     flex-grow:1;
     min-height:0;
-}
-
-.year-content-container{
-    --years-of-education: 6;
-    --timeslots: 4;
 }
 
 .schedule-flex{
@@ -89,7 +86,7 @@ html{
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
-.year-row::-webkit-scrollbar {
+.schedule-content::-webkit-scrollbar {
     display: none;
     width: 0px;
     background: transparent; /* make scrollbar transparent */
@@ -99,7 +96,8 @@ html{
     min-height:50px;
 }
 .year-row {
-    overflow-y: overlay;
+    /* de inhoud scrolt in .schedule-content; de rij zelf niet (overlay is vervallen) */
+    overflow-y: hidden;
     background-color: rgba(255,255,255,.5);
     flex-basis: auto;
 }
@@ -108,16 +106,6 @@ html{
     padding-right: 50px; /* Maximum width of scrollbar */
 }
 
-
-.year-content-subcontainer{
-    margin-right: -50px;
-    display: grid;
-    grid-auto-flow: row dense;
-    grid-column: 1 / calc(var(--timeslots) + 1);
-    grid-template-columns: subgrid;
-    grid-template-rows:inherit;
-
-}
 
 .appointment, .timeslot-header{
     padding: 1px 4px 1px 4px;
