@@ -7,7 +7,12 @@ body {
     cursor: none;
 }
 html{
-    height: 100%
+    height: 100%;
+    /* Letters schalen mee met het scherm (plan stap 2.1): dezelfde verhoudingen op full-HD en 4K.
+       --base-size is een fractie van de schermbreedte, --scale komt uit de URL-parameter scale.
+       Alle andere maten zijn in rem of em. */
+    --base-size: clamp(14px, 0.9vw, 48px);
+    font-size: calc(var(--base-size) * var(--scale, 1));
 }
 
 .flex {
@@ -20,11 +25,12 @@ html{
 #wrapper{
     flex-direction: column;
     height: 100%;
-    row-gap: 4px
+    row-gap: .25rem;
 }
 
 #title,#clock {
     color: rgb(240,240,240);
+    font-size: 1.6em;
 }
 
 .content-background{
@@ -49,12 +55,12 @@ html{
 }
 
 .year-row, .schedule-content-container{
-    column-gap: 10px;
+    column-gap: .6rem;
     row-gap: .1em;
 
 }
 .year-row, .schedule-content-container, .year-header, .padding-standard{
-    padding: 3px 3px 3px 3px
+    padding: .2rem;
 }
 
 .timeslot-header{
@@ -62,12 +68,12 @@ html{
 }
 
 .year-row.header{
-    max-height: 20px;
+    max-height: 1.6rem;
     flex-shrink: 0;
 }
 
 .year-header{
-    max-width: 15px
+    max-width: 1em;
 }
 
 .schedule-content-container{
@@ -95,7 +101,7 @@ html{
 }
 
 .year-row:not(.header){
-    min-height:50px;
+    min-height: 3rem;
 }
 .year-row {
     /* de inhoud scrolt in .schedule-content; de rij zelf in geen enkele richting (anders
@@ -111,7 +117,7 @@ html{
 
 
 .appointment, .timeslot-header{
-    padding: 1px 4px 1px 4px;
+    padding: .06rem .25rem;
 }
 .appointment{
     grid-column-start: var(--start-hour);
@@ -128,7 +134,7 @@ div.exam{
 div.appointment.new{
 
     background-clip: padding-box;
-    box-shadow: inset 0 0 10px #ff0000;
+    box-shadow: inset 0 0 .6rem #ff0000;
 }
 
 div.appointment.activity.cancelled{
@@ -143,23 +149,23 @@ div.appointment.activity.cancelled{
     content:" - "
 }
 .absence:first-child {
-    margin-left: 5px;
+    margin-left: .3rem;
 }
 
 #absences-container > div{
     flex-direction: row;
     flex-wrap: wrap;
-    row-gap: 3px;
-    column-gap: 3px;
+    row-gap: .2rem;
+    column-gap: .2rem;
 }
 
 /** extene activiteiten **/
 #outofoffice-inner-container {
-    margin-left: 5px;
+    margin-left: .3rem;
 }
 .outofoffice > div{
     display: inline;
-    margin-left: 5px;
+    margin-left: .3rem;
 
 }
 .outofoffice:not(:last-child)::after {
@@ -223,7 +229,7 @@ div.appointment.activity.cancelled{
     opacity: .5;
 }
 #absences-note {
-    margin-left: 5px;
+    margin-left: .3rem;
 }
 
 /* diagnosepaneel (debug=1) */
@@ -246,7 +252,7 @@ div.appointment.activity.cancelled{
     position: fixed;
     right: 4px;
     bottom: 2px;
-    font-size: 10px;
+    font-size: .6rem;
     font-weight: normal;
     color: rgba(255,255,255,.6);
 }
