@@ -9,10 +9,12 @@ import {AbsencesUiManager} from "./views/absences/absencesUiManager.js";
 import OutOfOffice from "./controllers/outofoffice/outOfOffice.js";
 import {OutOfOfficeUiManager} from "./views/outOfOffice/outOfOfficeUiManager.js";
 import {VERSION} from "./version.js";
+import DayRollover from "./dayRollover.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
 const STARTUP_TIMEOUT = 5*60*1000
+const MAINTENANCE_HOUR = 3
 
 console.log("Rowizer loaded, version " + VERSION)
 //TODO: remove this
@@ -62,12 +64,53 @@ let showTitle = function(){
     })
 }
 
-let dayChanged = function(){
-    changesManager.reset()
-    changesUiManager.refreshTable()
-    showTitle()
+// Alle verversloops, zodat ze na een dagwissel direct opnieuw kunnen lopen.
+let loops = []
+let refreshNow = function(){
+    loops.forEach(loop => loop.now())
 }
-window.dc = dayChanged
+let last_update = null
+
+// Nieuwe dag (plan stap R.7): gisteren weghalen, basisgegevens van vandaag laden en verversen,
+// zonder de pagina te herladen. Zolang de basisgegevens niet geladen zijn, toont het bord een melding.
+let switchDay = async function(date){
+    console.info("New day: " + date.toDateString())
+    let loading = connector.switchDay(date)
+    showTitle()
+    changesManager.reset()
+    changesUiManager.showMessage("Rooster van " + date.toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"}) + " wordt geladen")
+    absences.reset()
+    absencesUiManager.element.innerHTML = ""
+    document.querySelector("#absences-container").style.display = "none"
+    outofoffice.reset()
+    outOfOfficeUiManager.element.innerHTML = ""
+    document.querySelector("#outofoffice-container").style.display = "none"
+    try {
+        await loading
+    } catch (e) {
+        // de verversloop probeert het opnieuw (zie ChangesUiManager.refreshTable)
+    }
+    refreshNow()
+}
+window.dc = switchDay
+
+let rollover = new DayRollover({
+    currentDate: () => connector.date,
+    fixedDate: !!param_date,
+    onNewDay: switchDay,
+})
+
+// Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
+// Zermelo bereikbaar is, anders later opnieuw. Vervalt zodra stap 3.5 (versiecontrole) er is.
+let nextMaintenance = function(){
+    let at = new Date()
+    at.setHours(MAINTENANCE_HOUR, 0, 0, 0)
+    if(at.getTime() <= Date.now()){
+        at.setDate(at.getDate() + 1)
+    }
+    return at.getTime() + Math.floor(Math.random()*60*60*1000)
+}
+let maintenance_at = nextMaintenance()
 
 // Laat op het scherm zien als de getoonde gegevens niet actueel zijn.
 let showStatus = function(text){
@@ -78,7 +121,14 @@ let showStatus = function(text){
 
 // Ververst elke 5 minuten, na een fout al na een minuut. Een nieuwe ronde start pas als de vorige klaar is.
 let keepRefreshing = function(refresh){
+    let timer = null
+    let running = false
     let run = async function(){
+        clearTimeout(timer)
+        if(running){
+            return
+        }
+        running = true
         let ok = false
         try {
             ok = await refresh()
@@ -86,22 +136,34 @@ let keepRefreshing = function(refresh){
         catch(err){
             console.error(err)
         }
-        setTimeout(run, ok ? REFRESH_INTERVAL : RETRY_INTERVAL)
+        running = false
+        timer = setTimeout(run, ok ? REFRESH_INTERVAL : RETRY_INTERVAL)
     }
     run()
+    let loop = {now: run}
+    loops.push(loop)
+    return loop
 }
 
-// Dagwissel-check staat bewust los van het laden van data: ook als het laden
-// faalt (bv. op een dag zonder rooster) moet de pagina weer herladen worden.
-let last_checked_date = new Date();
+// Elke minuut: dagwissel, basisgegevens verversen als ze ouder zijn dan een uur, en de
+// onderhoudsherlading. Staat los van het laden van data, zodat het ook werkt als dat faalt.
 let started_at = Date.now()
 setInterval(()=> {
-    if(last_checked_date.toDateString() !== new Date().toDateString()){
-        window.rowizerReload()
+    rollover.check()
+    connector.refreshIfStale()
+
+    if(Date.now() >= maintenance_at){
+        let healthy = zapi.session.health.state === "ok" && last_update && Date.now() - last_update < 15*60*1000
+        if(healthy){
+            window.rowizerReload()
+        } else {
+            maintenance_at = Date.now() + 10*60*1000
+        }
     }
+
     // Zonder basisgegevens kan niets laden. De connector probeert het zelf opnieuw; alleen als
     // dat na STARTUP_TIMEOUT nog niet gelukt is, herladen we de pagina.
-    else if(!connector.isReady){
+    if(!connector.isReady){
         if(connector.loadError){
             showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
         }
@@ -112,7 +174,6 @@ setInterval(()=> {
 }, RETRY_INTERVAL)
 
 connector.waitUntilReady().then(a=>{
-    let last_update = null
     keepRefreshing(async ()=>{
         let ok = await changesUiManager.refreshTable();
         if(ok){

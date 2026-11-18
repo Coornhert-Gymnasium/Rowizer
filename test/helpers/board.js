@@ -17,7 +17,8 @@ export async function buildBoard(name = "2026-09-23", options = {}) {
     let api = new ZermeloApi({portal: fixtures.meta.portal, token: "test", session})
     let connector = new ZermeloConnector(api, fixtures.meta.date, {
         branch: fixtures.meta.branch,
-        ignore_departments: options.ignoreDepartments || []
+        ignore_departments: options.ignoreDepartments || [],
+        now: options.now,
     })
     await connector.waitUntilReady()
     let changes = new Changes(connector, {merge_multiple_hour_span: options.merge ?? true})

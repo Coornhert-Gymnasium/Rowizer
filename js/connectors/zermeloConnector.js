@@ -2,6 +2,10 @@ import {ZermeloError} from "../zermelo/utils/errors.js";
 import {setDayTables} from "../diagnostics.js";
 
 const STARTUP_RETRY_DELAY = 60*1000
+// Basisgegevens (groepen, leerlingen) kunnen overdag veranderen.
+const MAX_SNAPSHOT_AGE = 60*60*1000
+// Verwijst een afspraak naar iets onbekends, dan eerder verversen, maar niet vaker dan dit.
+const MIN_REFRESH_INTERVAL = 10*60*1000
 // Instellingen die niet kloppen (bv. schooljaar nog niet ingericht) lossen zich niet binnen een minuut op.
 const CONFIG_RETRY_DELAY = 30*60*1000
 
@@ -23,7 +27,9 @@ export default class ZermeloConnector {
     #resolveReady
     #ready
     #sleep
+    #now
     #stopped = false
+    #lastAttempt = 0
 
     /**
      * @param zapi ZermeloApi
@@ -40,6 +46,7 @@ export default class ZermeloConnector {
             ignoreDepartmentCodes: options.ignore_departments || [],
         }
         this.#sleep = options.sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)))
+        this.#now = options.now || (() => Date.now())
         this.#date = ZermeloConnector.#parseDate(date)
         this.#ready = new Promise(resolve => this.#resolveReady = resolve)
 
@@ -140,6 +147,43 @@ export default class ZermeloConnector {
     }
 
     /**
+     * Nieuwe dag: zet de datum en laad altijd een nieuwe momentopname. Tot dat gelukt is, is
+     * isCurrent false en blijft de vorige momentopname beschikbaar.
+     */
+    async switchDay(date){
+        if(!(date instanceof Date)){
+            throw new TypeError("Invalid date format must be a valid date.")
+        }
+        this.#date = date
+        return this.reload(date)
+    }
+
+    /** Hoort de momentopname bij de getoonde dag? */
+    get isCurrent(){
+        return !!this.#current && this.#current.forDate === this.#date.toDateString()
+    }
+
+    /** Ververs als de momentopname ouder is dan een uur. */
+    refreshIfStale(maxAge = MAX_SNAPSHOT_AGE){
+        if(this.#current && this.#now() - this.#current.loadedAt > maxAge && this.#now() - this.#lastAttempt > MIN_REFRESH_INTERVAL){
+            return this.reload().catch(() => undefined)
+        }
+        return Promise.resolve(undefined)
+    }
+
+    /**
+     * Een afspraak verwees naar een onbekende groep, afdeling of leerling: ververs, maar
+     * hoogstens eens per 10 minuten.
+     */
+    requestRefresh(){
+        if(this.#loading || this.#now() - this.#lastAttempt < MIN_REFRESH_INTERVAL){
+            return Promise.resolve(undefined)
+        }
+        console.info("Unknown group, department or student: refreshing base data")
+        return this.reload().catch(() => undefined)
+    }
+
+    /**
      * Laadt een nieuwe momentopname en neemt die over als het lukt. Gelijktijdige aanroepen
      * delen één laadronde.
      * @return {Promise<object>} de nieuwe momentopname
@@ -148,9 +192,14 @@ export default class ZermeloConnector {
         if(this.#loading){
             return this.#loading
         }
+        this.#lastAttempt = this.#now()
         this.#loading = (async () => {
             try {
                 let snapshot = await this.loadBaseData(date)
+                if(date !== this.#date && date.toDateString() !== this.#date.toDateString()){
+                    // intussen is de dag gewisseld: deze momentopname is al verouderd
+                    console.warn("Date changed while loading base data")
+                }
                 this.#current = snapshot
                 this.#loadError = undefined
                 this.#resolveReady(this)
@@ -261,7 +310,8 @@ export default class ZermeloConnector {
             })
 
         return Object.freeze({
-            loadedAt: Date.now(),
+            loadedAt: this.#now(),
+            forDate: date.toDateString(),
             schoolYear,
             week,
             branch,

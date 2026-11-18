@@ -166,6 +166,7 @@ class Changes {
             //this.#combineSpansMultipleHours(modified_appointments)
         }
 
+        let unknown_reference = false
         Object.values(modified_appointments).forEach(appointment=>{
             //bepalen of er hele afdelingen en/of jaarlagen in zitten
             //years heeft jaren als key en array met departments als value
@@ -185,6 +186,7 @@ class Changes {
                 if(!department){
                     console.warn("Appointment " + appointment.id + ": unknown group or department for group " + group_id)
                     countUnknownReference()
+                    unknown_reference = true
                     return
                 }
 
@@ -243,6 +245,11 @@ class Changes {
 
 
         })
+
+        // Een groep die vandaag is aangemaakt kent de momentopname nog niet: basisgegevens verversen.
+        if(unknown_reference && this.connector.requestRefresh){
+            this.connector.requestRefresh()
+        }
 
         let modified_objects_object = {}
         modified_appointments.forEach(app => modified_objects_object[app.id] = app)

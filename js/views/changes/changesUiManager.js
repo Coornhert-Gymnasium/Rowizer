@@ -214,7 +214,16 @@ export class ChangesUiManager {
      * @return {Promise<boolean>} false if the data could not be loaded or shown
      */
     async refreshTable() {
-        //TODO: this is quick n dirty way to show the new changes
+        // Na een dagwissel: eerst de basisgegevens van de nieuwe dag, anders klopt het raster niet.
+        if (!this.connector.isCurrent) {
+            this.showMessage("Rooster van " + this.connector.date.toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"}) + " wordt geladen")
+            try {
+                await this.connector.reload()
+            } catch (e) {
+                console.error(e)
+                return false
+            }
+        }
 
         try{
             var changed = await this.changesManager.loadData()
@@ -224,8 +233,10 @@ export class ChangesUiManager {
             return false;
 
         }
-        // Na een mislukte eerste keer moet de tabel ook opgebouwd worden als er niets gewijzigd is.
-        if (!this.tableReady || changed) {
+        // Na een mislukte eerste keer moet de tabel ook opgebouwd worden als er niets gewijzigd is,
+        // en na nieuwe basisgegevens (bv. een groep die vandaag is aangemaakt).
+        let snapshot = this.connector.snapshot
+        if (!this.tableReady || changed || snapshot !== this.drawnSnapshot) {
             this.tableReady = false
             try {
                 this.scroller.stop()
@@ -233,6 +244,7 @@ export class ChangesUiManager {
                 this.makeTable()
                 this.fillTable()
                 this.tableReady = true
+                this.drawnSnapshot = snapshot
             }
             catch (e){
                 console.error(e)
@@ -240,6 +252,18 @@ export class ChangesUiManager {
             }
         }
         return true
+    }
+
+    /**
+     * Toont een melding in plaats van het raster, bv. bij een dagwissel.
+     */
+    showMessage(text) {
+        this.scroller.stop()
+        this.tableReady = false
+        let message = document.createElement("div")
+        message.classList.add("board-message")
+        message.textContent = text
+        this.element.replaceChildren(message)
     }
 }
 
