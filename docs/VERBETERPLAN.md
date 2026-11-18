@@ -349,7 +349,8 @@ Ontwerpprincipes voor alle stappen:
 **R.10 Eén planner met eerlijke status (R10, R11, R4)**
 - Vervang de drie `keepRefreshing`-aanroepen door één module `js/scheduler.js`: per taak een
   naam, een interval, een laatste geslaagde tijd en de laatste fout. Start de taken met een
-  willekeurige vertraging van 0-20 s zodat schermen niet gelijk lopen.
+  willekeurige vertraging van 0-20 s zodat schermen niet gelijk lopen. (Later: start binnen 2 s en
+  ±10% spreiding op elk interval; zie besluit 10.)
 - Extra aanleidingen om direct te verversen: het `online`-event en `visibilitychange` naar
   zichtbaar.
 - Statusregel op basis van de planner:
@@ -640,7 +641,7 @@ zoals hier besloten.
 | 7 | Speler | Chromium 145.0.7632.116 op een Raspberry Pi met Debian 12 (bookworm), tijdzone Amsterdam | Zie werkafspraak 4. R.16 en R.17 zijn zinvol en worden uitgevoerd. R.6: de tijdzone is goed, maar een Pi heeft geen klok met batterij; de klokcontrole blijft dus nodig |
 | 8 | Dagroosters per afdeling (R.5) | Het Coornhert gebruikt er geen verschillende | R.5 in de eenvoudige vorm: één dagrooster, met een waarschuwing in de diagnose als er meer blijken te zijn |
 | 9 | Meldingen op het scherm (R.10) | Neutrale tekst op het scherm, technische details alleen in het diagnosepaneel | Teksten in R.10 en R.12 aangepast |
-| 10 | Zermelo-limieten | Zermelo hanteert geen verzoeklimiet per token. De app houdt zichzelf aan een eigen budget: 100 verzoeken per 10 minuten en 2500 per etmaal, per scherm | Budget en retrybeleid uit R.3 uitvoeren. Eerst 60 per 10 minuten; bij het testen op 18-11-2026 verhoogd naar 100, omdat twee keer verversen plus een paar extra rondes (elk opstarten ~20 verzoeken inclusief herhalingen) het bord minutenlang leeg liet |
+| 10 | Zermelo-limieten | Zermelo hanteert geen verzoeklimiet per token. De app houdt zichzelf aan een eigen budget: 200 verzoeken per 10 minuten en 2500 per etmaal, per scherm; hoogstens 3 tegelijk met 100 ms ertussen | Budget en retrybeleid uit R.3 uitvoeren. Eerst 60 per 10 minuten; bij het testen op 18-11-2026 verhoogd naar 100, omdat twee keer verversen plus een paar extra rondes (elk opstarten ~20 verzoeken inclusief herhalingen) het bord minutenlang leeg liet. Op verzoek van Tom (18-11-2026) naar 200, 3 tegelijk en 100 ms, en de planner start binnen 2 s in plaats van 0-20 s: het eerste bord staat er nu na ~3 s in plaats van ~10 s (afwezigen ~2 s in plaats van ~21 s) |
 
 ## 7. Stand van uitvoering
 

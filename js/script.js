@@ -409,8 +409,8 @@ connector.waitUntilReady().then(()=>{
         return true
     }, {interval: 15*60*1000, retryInterval: 15*60*1000})
 
-    // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
-    // stroomstoring) lopen daarna niet gelijk.
+    // Start binnen 2 s; de latere rondes krijgen ±10% spreiding, zodat schermen die tegelijk
+    // opstarten (bv. na een stroomstoring) daarna niet gelijk lopen.
     scheduler.start()
 })
 

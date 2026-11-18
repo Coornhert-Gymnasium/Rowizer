@@ -15,12 +15,14 @@ const RATE_LIMIT_WAIT = 60*1000
  * Bewust geen URL-parameter.
  */
 const LIMITS = {
-    concurrent: 2,
-    spacing: 250,
+    // Opstarten zijn ~18 verzoeken; met 3 tegelijk en 100 ms ertussen is dat in een paar seconden klaar.
+    concurrent: 3,
+    spacing: 100,
     windowLength: 10*60*1000,
-    // 60 bleek in de praktijk te krap: twee keer verversen (elk ~20 verzoeken met herhalingen)
-    // plus een paar extra rondes liet het bord minutenlang leeg. 100 is nog ~7x normaal gebruik.
-    windowMax: 100,
+    // Eerst 60, daarna 100: na een paar keer herladen (elk opstarten ~18 verzoeken, met herhalingen
+    // meer) moest het bord minuten wachten. 200 laat ruim 10 keer opstarten in 10 minuten toe en is
+    // ~14x normaal gebruik; een lus die doordraait wordt nog steeds binnen een minuut afgeremd.
+    windowMax: 200,
     dayMax: 2500,
     maxWait: 2*60*1000,
 }
