@@ -74,6 +74,7 @@ function mergeSubsequentAppointments(appointments){
     )
 }
 
-function arraysEqual(a,b){return JSON.stringify(a.sort()) === JSON.stringify(b.sort())}
+// Sorteert kopieën: een vergelijking mag de volgorde van docenten of lokalen niet veranderen.
+function arraysEqual(a,b){return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort())}
 
 export {arraysEqual, mergeAppointments, mergeSubsequentAppointments}

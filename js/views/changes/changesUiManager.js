@@ -165,7 +165,8 @@ export class ChangesUiManager {
                             }
                             // Maak een fake group, met naam uit "subject" van de afspraak, en extended name uit "remark" van de afspraak. 
                             // Niet elke afspraak heeft een vak: gebruik dan alleen de opmerking als naam.
-                            let subject = appointment.subjects[0]
+                            // alfabetisch eerste vak, zoals het bord altijd toonde (zie appointmentText.js)
+                            let subject = [...appointment.subjects].sort()[0]
                             let remark = subject ? subject.substring(0, 6) : ""
                             if (appointment.type === "exam" || !subject) {
                                 // toetsen krijgen uitgebreide beschrijving:

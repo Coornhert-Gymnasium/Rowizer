@@ -35,7 +35,9 @@ test("andere docent of uitval: niet samenvoegen", () => {
     assert.equal(mergeSubsequentAppointments([lesson(1, 2, 2), lesson(2, 3, 3, {cancelled: true})]).length, 2)
 })
 
-test("arraysEqual negeert volgorde", () => {
-    assert.equal(arraysEqual(["b", "a"], ["a", "b"]), true)
+test("arraysEqual negeert volgorde en verandert de lijsten niet", () => {
+    let a = ["men04", "huu"]
+    assert.equal(arraysEqual(a, ["huu", "men04"]), true)
+    assert.deepEqual(a, ["men04", "huu"])
     assert.equal(arraysEqual(["a"], ["a", "b"]), false)
 })

@@ -15,8 +15,8 @@
 2 | 4-4 | lesson | hv2d gd sld04 a270
 2 | 4-4 | lesson | hv2e gd zui b001
 2 | 2-2 | lesson | hv2g en msn a266
-3 | 4-6 | activity | b3a Act huu,men04 a236
-3 | 4-6 | activity | b3b Act huu,men04 a236
+3 | 4-6 | activity | b3a Act huu,men04 a236+1
+3 | 4-6 | activity | b3b Act huu,men04 a236+1
 3 | 3-3 | lesson | b3b ma cir a268
 3 | 4-6 | lesson cancelled | b3.bwi1 sld07  vervalt
 3 | 4-6 | lesson | b3.eo1 sld05 b111
@@ -45,7 +45,7 @@
 4 | 1-1 | lesson | v4b entl msn a266
 4 | 3-3 | lesson | v4b entl msn a266
 4 | 6-6 | lesson | wisa men27 leerplein a
-4 | 3-3 | lesson | wisa wro a030
+4 | 3-3 | lesson | wisa wro a030+1
 5 | 6-6 | lesson | entl men24 leerplein a
 5 | 3-3 | lesson | entl men23 leerplein a
 5 | 4-4 | lesson | h5.entl6 msn a266
@@ -57,6 +57,6 @@
 5 | 6-6 | lesson | v5.nat1 qed binask10
 5 | 3-3 | lesson | v5b entl msn a266
 5 | 6-6 | lesson | wisa men27 leerplein a
-5 | 3-3 | lesson | wisa wro a030
+5 | 3-3 | lesson | wisa wro a030+1
 6 | 1-9 | lesson | swt_a men11 leerplein b
 6 | 5-5 | lesson | v6b entl msn a266

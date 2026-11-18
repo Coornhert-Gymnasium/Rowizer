@@ -41,8 +41,23 @@ test("geen vak: opmerking van de roostermaker", () => {
     assert.equal(appointmentText(mainGroup, appointment({subjects: [], remark: "mentor"})), "hv1c mentor cir a268")
 })
 
-test("kortste lokaalnaam wordt getoond", () => {
-    assert.equal(appointmentText(mainGroup, appointment({locations: ["leerplein a", "a030"]})), "hv1c fa cir a030")
+test("meer lokalen: kortste naam en +n, zonder de afspraak te wijzigen", () => {
+    let a = appointment({locations: ["leerplein a", "a030"]})
+    assert.equal(appointmentText(mainGroup, a), "hv1c fa cir a030+1")
+    assert.deepEqual(a.locations, ["leerplein a", "a030"])
+})
+
+test("afspraak zonder lesuur: tijd achter het lokaal, ook zonder lokaal", () => {
+    assert.equal(appointmentText(cluster, appointment({type: "exam", timeLabel: "14:00-14:50"})), "h3.fa5 cir a268 14:00-14:50")
+    assert.equal(appointmentText(cluster, appointment({type: "exam", locations: [], timeLabel: "14:00-14:50"})), "h3.fa5 cir 14:00-14:50")
+    assert.equal(appointmentText(cluster, appointment({type: "exam", locations: ["a1", "a222"], timeLabel: "9:00-9:50"})), "h3.fa5 cir a1+1 9:00-9:50")
+})
+
+test("vakken en docenten alfabetisch, zonder de afspraak te wijzigen", () => {
+    let a = appointment({subjects: ["wisb", "wisa"], teachers: ["men04", "huu"]})
+    assert.equal(appointmentText(mainGroup, a), "hv1c wisa+1 huu,men04 a268")
+    assert.deepEqual(a.subjects, ["wisb", "wisa"])
+    assert.deepEqual(a.teachers, ["men04", "huu"])
 })
 
 test("meer dan twee docenten: twee namen en het aantal dat niet getoond wordt", () => {
