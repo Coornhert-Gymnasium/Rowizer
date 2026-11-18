@@ -107,3 +107,34 @@ test("onRound wordt na elke ronde aangeroepen", async () => {
     await new Promise(resolve => setImmediate(resolve))
     assert.deepEqual(rounds, ["changes"])
 })
+
+// S14 uit de storingsmatrix: scherm weer aan
+test("gebeurtenis: eerst beforeEvent (dagwissel), ook binnen de minuut", async () => {
+    let timers = fakeTimers()
+    let order = []
+    let s = scheduler(timers, {beforeEvent: () => order.push("dag")})
+    s.add("changes", async () => { order.push("ververs"); return true })
+    s.start()
+    assert.equal(s.runAfterEvent(), true)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(s.runAfterEvent(), false, "binnen de minuut niet nog eens verversen")
+    assert.deepEqual(order, ["dag", "ververs", "dag"])
+})
+
+// S15 (deels): na heel veel rondes nog steeds één timer per taak
+test("veel rondes: geen oplopend aantal timers", async () => {
+    let timers = fakeTimers()
+    let s = scheduler(timers)
+    let n = 0
+    s.add("changes", async () => (++n % 7) !== 0)
+    s.add("absences", async () => { throw new Error("x") })
+    s.start()
+    for (let i = 0; i < 500; i++) {
+        await timers.fireAll()
+        assert.equal(timers.timers.size, 2)
+    }
+    s.runNow()
+    s.runAfterEvent()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(timers.timers.size, 2)
+})

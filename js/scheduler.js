@@ -16,6 +16,7 @@ export default class Scheduler {
      * @param options.now, options.random, options.setTimeout, options.clearTimeout voor de tests
      * @param options.startDelay maximale willekeurige startvertraging, standaard 20 s
      * @param options.onRound (task) => void, na elke afgeronde ronde
+     * @param options.beforeEvent () => void, bij elke gebeurtenis (scherm aan, netwerk terug), ook binnen de minuut
      */
     constructor(options = {}) {
         this.now = options.now || (() => Date.now())
@@ -25,6 +26,7 @@ export default class Scheduler {
         this.startDelay = options.startDelay ?? 20*1000
         this.onRound = options.onRound || (() => {})
         this.isResting = options.isResting || (() => false)
+        this.beforeEvent = options.beforeEvent || (() => {})
         this.heartbeat = null
     }
 
@@ -84,6 +86,12 @@ export default class Scheduler {
      * @return {boolean} of er ververst wordt
      */
     runAfterEvent() {
+        // eerst bv. de dagwissel controleren: na een nacht uit moet de nieuwe dag geladen worden
+        try {
+            this.beforeEvent()
+        } catch (e) {
+            console.error(e)
+        }
         if (this.lastEventRun && this.now() - this.lastEventRun < EVENT_MIN_INTERVAL) {
             return false
         }

@@ -271,6 +271,8 @@ let rollover = new DayRollover({
     onNewDay: switchDay,
     now: appNow,
 })
+// Scherm weer aan na een nacht (S14): eerst de dag controleren, dan pas verversen.
+scheduler.beforeEvent = () => rollover.check()
 
 // Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
 // Zermelo bereikbaar is, anders later opnieuw. Een nieuwe versie komt sinds stap 3.5 al binnen een

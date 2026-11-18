@@ -80,6 +80,7 @@ class Session{
      * @param options.random eigen toevalsgenerator (tests)
      * @param options.store opslag voor het budget, standaard window.name
      * @param options.retryDelays wachttijden tussen pogingen
+     * @param options.requestTimeout ms voordat een hangend verzoek wordt afgebroken, standaard 30 s
      */
     constructor(portal, token, options = {}) {
         this.portal = portal;
@@ -89,6 +90,7 @@ class Session{
         this.sleep = options.sleep || (ms => new Promise(resolve => setTimeout(resolve, ms)))
         this.random = options.random || Math.random
         this.retryDelays = options.retryDelays || RETRY_DELAYS
+        this.requestTimeout = options.requestTimeout ?? REQUEST_TIMEOUT
         this.store = options.store || (globalThis.window ? windowNameStore : memoryStore())
         this.#budget = this.#loadBudget()
     }
@@ -312,7 +314,7 @@ class Session{
 
         // Zonder time-out kan een hangende verbinding het verversen voor altijd blokkeren.
         let controller = new AbortController()
-        let timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+        let timeout = setTimeout(() => controller.abort(), this.requestTimeout)
 
         let result
         try {
