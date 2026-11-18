@@ -286,9 +286,10 @@ export class ChangesUiManager {
         do_app(app_filtered.filter(app => app.type === 'lesson' && app.valid && !app.cancelled), this)
         do_app(app_filtered.filter(app => app.type === 'lesson' && app.valid && app.cancelled), this)
 
-        // als onderstaand AAN staat, dan staat bij docent wijziging de les twee keer op het bord, de oude gewijzigde les is !valid
-        //  dis komt anders als "vervalt" met de oude docent op het bord.
-        //do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid), this)
+        // Oude versies (!valid) alleen als de les naar een ander uur verplaatst is (plan stap 3.3); als
+        // laatste, zodat ze wegvallen als de groep op dat uur al iets anders op het bord heeft. Andere
+        // oude versies (alleen een ander lokaal of een andere docent) zouden er als "vervalt" bij komen.
+        do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid && app.movedTo), this)
 
         return changes.sort(compareChanges)
     }

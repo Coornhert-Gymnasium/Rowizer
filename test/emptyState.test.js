@@ -17,7 +17,7 @@ test("lesdag zonder weekrooster maar met wijzigingen: wijzigingen blijven zichtb
     await changes.loadData()
     let items = ui.collectChanges().length
     assert.equal(connector.getTodayTimeSlots().length, 0)
-    assert.equal(items, 62)
+    assert.equal(items, 63)
     assert.equal(emptyState(0, items), null)
 })
 

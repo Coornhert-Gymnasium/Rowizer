@@ -10,7 +10,7 @@ import {compareChanges} from "../js/views/changes/changesUiManager.js"
 // browser toont voor dezelfde dag (SHA-256 gelijk). Verandert dit bestand, dan verandert het bord.
 test("bord van 23-9-2026 blijft gelijk", async () => {
     let {lines} = await boardSnapshot("2026-09-23")
-    assert.equal(lines.length, 62)
+    assert.equal(lines.length, 63)
     matchSnapshot("board-2026-09-23", lines)
 })
 

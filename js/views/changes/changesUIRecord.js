@@ -31,7 +31,7 @@ export class ChangesUIRecord {
             classes.push("new")
         }
         if(!this.appointment.valid) {
-            classes.push('invalid');
+            classes.push(this.appointment.movedTo ? 'moved' : 'invalid');
         }
         if(this.appointment.cancelled) {
             classes.push('cancelled');
@@ -52,12 +52,15 @@ export class ChangesUIRecord {
         el.dataset.endRank = this.period_end;
         let text = this.getInnerText()
         // "vervalt" apart, zodat het opvalt (plan stap 2.5); de tekst zelf blijft gelijk
+        // idem voor "verplaatst naar u4" (plan stap 3.3)
         let cancelled = text.match(/^(.*?)((?:toets )?vervalt)$/s)
-        if (cancelled) {
+        let moved = text.match(/^(.*?)(verplaatst naar u[\d-]+)$/s)
+        if (cancelled || moved) {
+            let [, before, words] = cancelled || moved
             let word = document.createElement("span")
-            word.classList.add("cancelled-word")
-            word.textContent = cancelled[2]
-            el.append(document.createTextNode(cancelled[1]), word)
+            word.classList.add(cancelled ? "cancelled-word" : "moved-word")
+            word.textContent = words
+            el.append(document.createTextNode(before), word)
         } else {
             el.innerText = text
         }
