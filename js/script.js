@@ -215,6 +215,7 @@ let started_at = Date.now()
 setInterval(()=> {
     rollover.check()
     connector.refreshIfStale()
+    changesUiManager.markTime()
 
     if(appNow() >= maintenance_at){
         let last_success = scheduler.task("changes")?.lastSuccess

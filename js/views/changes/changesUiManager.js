@@ -1,4 +1,23 @@
 import ChangesUIRecordClass from "./changesUIRecordClass.js";
+import {now as appNow} from "../../appTime.js";
+
+/**
+ * Wat er nu is (plan stap 2.3): het lopende lesuur en welke lesuren voorbij zijn.
+ * @param slots lesuren van vandaag (startDt, endDt, timeSlotName.rank)
+ * @param now epoch ms
+ * @return {{current: number|null, isPast: (rank: number) => boolean}}
+ */
+export function timeMarks(slots, now) {
+    let current = slots.find(slot => slot.startDt.getTime() <= now && now < slot.endDt.getTime())
+    return {
+        current: current ? current.timeSlotName.rank : null,
+        // een item is voorbij als het lesuur waarin het eindigt voorbij is
+        isPast: rank => {
+            let upTo = slots.filter(slot => slot.timeSlotName.rank <= rank)
+            return upTo.length > 0 && upTo.at(-1).endDt.getTime() <= now
+        },
+    }
+}
 
 const TYPE_ORDER = {activity: 0, exam: 1, lesson: 2}
 
@@ -341,9 +360,27 @@ export class ChangesUiManager {
             this.tableReady = true
             this.drawnSnapshot = snapshot
             this.scroller.start(scrolled)
+            this.markTime()
         }
         this.lastFailure = null
         return true
+    }
+
+    /**
+     * Markeert het lopende lesuur en dimt voorbije items (plan stap 2.3). Alleen als het bord
+     * vandaag toont; verandert alleen klassen, de tabel wordt niet opnieuw opgebouwd.
+     */
+    markTime(now = appNow()) {
+        let today = new Date(now)
+        today.setHours(0, 0, 0, 0)
+        let isToday = this.connector.date.getTime() === today.getTime()
+        let marks = isToday ? timeMarks(this.connector.getTodayTimeSlots(), now) : {current: null, isPast: () => false}
+        this.element.querySelectorAll(".timeslot-header").forEach(el => {
+            el.classList.toggle("current", Number(el.dataset.timeslot) === marks.current)
+        })
+        this.element.querySelectorAll(".appointment").forEach(el => {
+            el.classList.toggle("past", marks.isPast(Number(el.dataset.endRank)))
+        })
     }
 
     /**

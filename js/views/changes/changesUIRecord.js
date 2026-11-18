@@ -48,6 +48,8 @@ export class ChangesUIRecord {
         el.style.setProperty('--start-hour', this.columnStart ?? this.period_start);
         el.style.setProperty('--end-hour', this.columnEnd ?? this.period_end);
         el.setAttribute('data-appointment-id', this.appointment.id);
+        // voor het dimmen van voorbije items (plan stap 2.3)
+        el.dataset.endRank = this.period_end;
         let text = this.getInnerText()
         // "vervalt" apart, zodat het opvalt (plan stap 2.5); de tekst zelf blijft gelijk
         let cancelled = text.match(/^(.*?)((?:toets )?vervalt)$/s)

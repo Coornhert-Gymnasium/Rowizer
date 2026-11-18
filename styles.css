@@ -66,6 +66,15 @@ html{
 .timeslot-header{
     text-align: center;
 }
+/* het lopende lesuur (plan stap 2.3) */
+.timeslot-header.current{
+    background-color: rgba(255,255,255,.8);
+    border-radius: .3rem;
+}
+/* voorbij: minder nadruk, niet verbergen */
+.appointment.past{
+    opacity: .45;
+}
 
 .year-row.header{
     max-height: 1.6rem;
