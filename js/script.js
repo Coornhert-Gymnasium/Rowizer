@@ -20,6 +20,7 @@ import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
 import {measureClockOffset, clockNote} from "./clockCheck.js";
 import diagnostics from "./diagnostics.js";
 import {parseWindow, isResting} from "./activeWindow.js";
+import {fetchVersion, shouldReload, triedStore} from "./versionCheck.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -212,7 +213,8 @@ let rollover = new DayRollover({
 })
 
 // Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
-// Zermelo bereikbaar is, anders later opnieuw. Vervalt zodra stap 3.5 (versiecontrole) er is.
+// Zermelo bereikbaar is, anders later opnieuw. Een nieuwe versie komt sinds stap 3.5 al binnen een
+// kwartier; dit blijft voor een schone start per dag (geheugen) op een scherm dat dag en nacht aan staat.
 let nextMaintenance = function(){
     let at = new Date(appNow())
     at.setHours(MAINTENANCE_HOUR, 0, 0, 0)
@@ -222,6 +224,16 @@ let nextMaintenance = function(){
     return at.getTime() + Math.floor(Math.random()*60*60*1000)
 }
 let maintenance_at = nextMaintenance()
+
+// Alleen herladen (onderhoud, nieuwe versie) als Zermelo bereikbaar is en het bord actueel:
+// anders staat er na het herladen niets meer op.
+let healthy = function(){
+    let changes_task = scheduler.task("changes")
+    let last_success = changes_task?.lastSuccess
+    // in rusttijd is de laatste ronde vanzelf ouder dan een kwartier
+    let recent = last_success && (Date.now() - last_success < 15*60*1000 || (resting() && changes_task.failures === 0))
+    return zapi.session.health.state === "ok" && !!recent
+}
 
 // Elke minuut: dagwissel, basisgegevens verversen als ze ouder zijn dan een uur, de
 // onderhoudsherlading en de status. Staat los van het laden van data, zodat het ook werkt als dat faalt.
@@ -242,12 +254,7 @@ setInterval(()=> {
     was_resting = rest
 
     if(appNow() >= maintenance_at){
-        let changes_task = scheduler.task("changes")
-        let last_success = changes_task?.lastSuccess
-        // in rusttijd is de laatste ronde vanzelf ouder dan een kwartier
-        let recent = last_success && (Date.now() - last_success < 15*60*1000 || (rest && changes_task.failures === 0))
-        let healthy = zapi.session.health.state === "ok" && recent
-        if(healthy){
+        if(healthy()){
             window.rowizerReload("nightly maintenance")
         } else {
             maintenance_at = appNow() + 10*60*1000
@@ -317,6 +324,23 @@ connector.waitUntilReady().then(()=>{
         rollover.check()
         return true
     }, {interval: 60*60*1000, retryInterval: 15*60*1000})
+
+    // Nieuwe versie op de webserver (plan stap 3.5): herladen. Gaat naar de eigen webserver, niet
+    // naar Zermelo. Is het bord niet gezond, dan het volgende kwartier opnieuw.
+    scheduler.add("version", async ()=>{
+        let remote = await fetchVersion({url: new URL("./version.js", import.meta.url)})
+        if(shouldReload({loaded: VERSION, remote, tried: triedStore.get()})){
+            if(!healthy()){
+                console.info("New version " + remote + " available, waiting until the board is up to date")
+                return true
+            }
+            triedStore.set(remote)
+            window.rowizerReload("new version " + remote)
+        } else if(remote && remote !== VERSION){
+            console.warn("Version " + remote + " is on the server, but " + VERSION + " was loaded again (cache?)")
+        }
+        return true
+    }, {interval: 15*60*1000, retryInterval: 15*60*1000})
 
     // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
     // stroomstoring) lopen daarna niet gelijk.
