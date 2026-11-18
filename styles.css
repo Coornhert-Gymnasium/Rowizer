@@ -51,7 +51,8 @@ html{
 .schedule-container{
     flex-direction: column;
     flex-grow: 1;
-    row-gap: .5em;
+    /* iets krapper dan eerst (.5em), zodat een drukke dag met de legenda erbij op 1920x1080 past */
+    row-gap: .35em;
 }
 
 .year-row, .schedule-content-container{
@@ -116,6 +117,7 @@ html{
     /* de inhoud scrolt in .schedule-content; de rij zelf in geen enkele richting (anders
        verschijnt er een horizontale scrollbalk door de marge van .schedule-content) */
     overflow: hidden;
+    padding: .15rem;
     background-color: rgba(255,255,255,.5);
     flex-basis: auto;
 }
@@ -249,7 +251,8 @@ div.appointment.cancelled{
 /* legenda (plan stap 2.4) */
 #legend{
     column-gap: 1.2rem;
-    font-size: .8rem;
+    font-size: .7rem;
+    line-height: 1.1;
     color: rgb(240,240,240);
     padding: 0 .2rem;
 }
