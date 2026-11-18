@@ -13,7 +13,7 @@ import DayRollover from "./dayRollover.js";
 import Scheduler from "./scheduler.js";
 import {computeStatus} from "./status.js";
 import {checkToken, tokenNote} from "./tokenCheck.js";
-import {readSettings} from "./settings.js";
+import {readSettings, rememberToken, urlWithoutToken} from "./settings.js";
 import {missingSettings, showSetupScreen} from "./setupScreen.js";
 import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
@@ -34,6 +34,12 @@ console.log("Rowizer loaded, version " + VERSION)
 
 // Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
 let params = readSettings(window.location)
+// rememberToken=1 (plan stap 3.6): token bewaren en uit de adresbalk halen
+let local_storage = null
+try { local_storage = window.localStorage } catch (e) { /* geen opslag */ }
+if(local_storage && rememberToken(params, local_storage)){
+    history.replaceState(null, "", urlWithoutToken(window.location.href))
+}
 let param_debug = params.get("debug") === "1"
 
 // Grootte van alles op het scherm bijstellen zonder browserzoom (plan stap 2.1), bv. scale=1.2.
