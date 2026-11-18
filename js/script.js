@@ -19,6 +19,7 @@ import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
 import {measureClockOffset, clockNote} from "./clockCheck.js";
 import diagnostics from "./diagnostics.js";
+import {parseWindow, isResting} from "./activeWindow.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -81,6 +82,8 @@ let param_ignore = params.get("departmentsIgnore");
 let param_merge = params.get("mergeAppointments")
 let param_external = params.get("external")
 param_external = param_external ? param_external : "extern"
+// verversvenster (plan stap 3.2), bv. active=07:00-17:00, of active=off voor altijd
+let active_window = parseWindow(params.get("active"))
 
 var zapi = new ZermeloApi({
     portal: params.get("portal"),
@@ -106,9 +109,18 @@ var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#out
 window.cm = changesUiManager
 window.zc = connector
 
+// Rusttijd (plan stap 3.2): buiten het venster of op een dag zonder lessen niet verversen.
+let resting = () => isResting({
+    window: active_window,
+    now: appNow(),
+    isReady: connector.isReady && connector.isCurrent,
+    lessons: connector.isReady ? connector.getTodayTimeSlots().length : 0,
+})
+let was_resting = false
+
 // Eén planner voor alle verversloops (plan stap R.10): elke 5 minuten, na een mislukte ronde
 // na een minuut, met een willekeurige start zodat schermen niet gelijk lopen.
-let scheduler = new Scheduler({onRound: task => {
+let scheduler = new Scheduler({isResting: resting, onRound: task => {
     // een geslaagde ronde haalt de rem van de waakhond (index.html)
     if(task.failures === 0 && window.rowizerReloadOk){
         window.rowizerReloadOk()
@@ -133,6 +145,8 @@ let updateStatus = function(){
         changesFailure: changesUiManager.lastFailure,
         absences: absences_allowed ? scheduler.task("absences") : undefined,
         clockOffset: clockOffset(),
+        // alleen als de laatste ronde slaagde: een storing blijft ook in rusttijd zichtbaar
+        resting: resting() && scheduler.task("changes")?.failures === 0,
     })
 
     let bar = document.querySelector("#status")
@@ -214,12 +228,25 @@ let maintenance_at = nextMaintenance()
 let started_at = Date.now()
 setInterval(()=> {
     rollover.check()
-    connector.refreshIfStale()
     changesUiManager.markTime()
 
+    // Begin van het verversvenster: direct verversen, niet pas na de volgende geplande ronde.
+    let rest = resting()
+    if(was_resting && !rest){
+        console.info("Active window started, refreshing")
+        connector.refreshIfStale()
+        scheduler.runNow()
+    } else if(!rest){
+        connector.refreshIfStale()
+    }
+    was_resting = rest
+
     if(appNow() >= maintenance_at){
-        let last_success = scheduler.task("changes")?.lastSuccess
-        let healthy = zapi.session.health.state === "ok" && last_success && Date.now() - last_success < 15*60*1000
+        let changes_task = scheduler.task("changes")
+        let last_success = changes_task?.lastSuccess
+        // in rusttijd is de laatste ronde vanzelf ouder dan een kwartier
+        let recent = last_success && (Date.now() - last_success < 15*60*1000 || (rest && changes_task.failures === 0))
+        let healthy = zapi.session.health.state === "ok" && recent
         if(healthy){
             window.rowizerReload("nightly maintenance")
         } else {
@@ -241,7 +268,7 @@ setInterval(()=> {
 }, RETRY_INTERVAL)
 
 connector.waitUntilReady().then(()=>{
-    scheduler.add("changes", () => changesUiManager.refreshTable(), {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+    scheduler.add("changes", () => changesUiManager.refreshTable(), {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL, rest: true})
 
     scheduler.add("absences", async ()=>{
         if(!absences_allowed){
@@ -265,7 +292,7 @@ connector.waitUntilReady().then(()=>{
             }
             throw err
         }
-    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL, rest: true})
 
     let external_location_known = false
     scheduler.add("outofoffice", async ()=>{
@@ -276,7 +303,7 @@ connector.waitUntilReady().then(()=>{
         await outOfOfficeUiManager.refresh()
         document.querySelector("#outofoffice-container").style.display = outofoffice.outOfOffices.length ? null : "none"
         return true
-    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL, rest: true})
 
     // Zelfcontrole van het token (plan stap R.12): eens per dag, na een fout over een uur opnieuw.
     scheduler.add("token", async ()=>{

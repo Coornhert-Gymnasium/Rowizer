@@ -24,6 +24,7 @@ export default class Scheduler {
         this.clearTimeout = options.clearTimeout || (id => clearTimeout(id))
         this.startDelay = options.startDelay ?? 20*1000
         this.onRound = options.onRound || (() => {})
+        this.isResting = options.isResting || (() => false)
         this.heartbeat = null
     }
 
@@ -32,6 +33,7 @@ export default class Scheduler {
      * @param run async () => boolean; true = geslaagd. Een fout telt als mislukt.
      * @param options.interval na een geslaagde ronde, standaard 5 min
      * @param options.retryInterval na een mislukte ronde, standaard 1 min
+     * @param options.rest true = in rusttijd overslaan (plan stap 3.2), zie #runTask
      */
     add(name, run, options = {}) {
         let task = {
@@ -39,6 +41,7 @@ export default class Scheduler {
             run,
             interval: options.interval ?? 5*60*1000,
             retryInterval: options.retryInterval ?? 60*1000,
+            rest: !!options.rest,
             addedAt: this.now(),
             lastAttempt: null,
             lastSuccess: null,
@@ -85,7 +88,7 @@ export default class Scheduler {
             return false
         }
         this.lastEventRun = this.now()
-        this.runNow()
+        this.#tasks.forEach(task => this.#runTask(task, {timed: true}))
         return true
     }
 
@@ -105,12 +108,30 @@ export default class Scheduler {
 
     #schedule(task, delay) {
         this.clearTimeout(task.timer)
-        task.timer = this.setTimeout(() => this.#runTask(task), delay)
+        task.timer = this.setTimeout(() => this.#runTask(task, {timed: true}), delay)
     }
 
-    async #runTask(task) {
+    /**
+     * Rusttijd (plan stap 3.2): een geplande ronde (of een na een gebeurtenis) wordt overgeslagen,
+     * zolang de taak al eens geslaagd is en de laatste ronde niet mislukte; zo komt er na het
+     * opstarten of een dagwissel toch een bord. runNow() loopt altijd. Een overgeslagen ronde
+     * geeft wel een hartslag: het bord staat stil, maar hangt niet.
+     */
+    #skipForRest(task) {
+        return task.rest && task.lastSuccess !== null && task.failures === 0 && this.isResting()
+    }
+
+    async #runTask(task, {timed = false} = {}) {
         this.clearTimeout(task.timer)
         if (task.running) {
+            return
+        }
+        if (timed && this.#skipForRest(task)) {
+            this.heartbeat = this.now()
+            if (globalThis.window) {
+                window.rowizerHeartbeat = this.heartbeat
+            }
+            this.#schedule(task, task.interval)
             return
         }
         task.running = true
