@@ -12,6 +12,7 @@ import {VERSION} from "./version.js";
 import DayRollover from "./dayRollover.js";
 import Scheduler from "./scheduler.js";
 import {computeStatus} from "./status.js";
+import {checkToken, tokenNote} from "./tokenCheck.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -70,6 +71,7 @@ scheduler.listen()
 window.rowizerScheduler = scheduler
 
 let absences_allowed = true
+let token_info = null
 
 // Laat op het scherm zien hoe actueel de gegevens zijn (besluit 9: neutrale tekst, de oorzaak
 // als korte code rechtsonder).
@@ -93,7 +95,7 @@ let updateStatus = function(){
         changesUiManager.showMessage(status.boardMessage)
     }
 
-    document.querySelector("#footer").textContent = [status.code, status.updated, VERSION].filter(Boolean).join(" · ")
+    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), status.updated, VERSION].filter(Boolean).join(" · ")
 
     let absences_container = document.querySelector("#absences-container")
     absences_container.classList.toggle("stale", status.absences === "stale")
@@ -218,6 +220,12 @@ connector.waitUntilReady().then(()=>{
         document.querySelector("#outofoffice-container").style.display = outofoffice.outOfOffices.length ? null : "none"
         return true
     }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+
+    // Zelfcontrole van het token (plan stap R.12): eens per dag, na een fout over een uur opnieuw.
+    scheduler.add("token", async ()=>{
+        token_info = await checkToken(zapi.session)
+        return true
+    }, {interval: 24*60*60*1000, retryInterval: 60*60*1000})
 
     // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
     // stroomstoring) lopen daarna niet gelijk.
