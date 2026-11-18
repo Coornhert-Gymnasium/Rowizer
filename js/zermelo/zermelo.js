@@ -39,7 +39,8 @@ class ZermeloApi  {
         this.#url = "https://"+this.portal+".zportal.nl/api/v"+this.version+"/"
 
         //this.test =   new SwaggerClient('https://'+this.portal+'.zportal.nl/static/swagger/api-docs.json')
-        this.#session = new Session(this.portal, this.token);
+        // een eigen sessie kan worden meegegeven, bv. voor de tests
+        this.#session = options.session || new Session(this.portal, this.token);
 
         this.schools = new SchoolsManager(this.#session);
         this.appointments = new AppointmentsManager(this.#session);

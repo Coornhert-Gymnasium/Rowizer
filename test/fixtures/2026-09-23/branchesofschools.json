@@ -1,0 +1,13 @@
+[
+{"id":1,"schoolInSchoolYear":1,"branch":"a","name":"vestigingA","schoolYear":2020},
+{"id":2,"schoolInSchoolYear":3,"branch":"a","name":"vestigingA","schoolYear":2021},
+{"id":51,"schoolInSchoolYear":51,"branch":"a","name":"vestigingA","schoolYear":2022},
+{"id":151,"schoolInSchoolYear":151,"branch":"a","name":"vestigingA","schoolYear":2021},
+{"id":251,"schoolInSchoolYear":201,"branch":"a","name":"vestigingA","schoolYear":2019},
+{"id":301,"schoolInSchoolYear":251,"branch":"a","name":"vestigingA","schoolYear":2018},
+{"id":451,"schoolInSchoolYear":401,"branch":"a","name":"vestigingA","schoolYear":2023},
+{"id":1001252,"schoolInSchoolYear":1001102,"branch":"a","name":"vestigingA","schoolYear":2024},
+{"id":1001552,"schoolInSchoolYear":1001352,"branch":"a","name":"vestigingA","schoolYear":2025},
+{"id":1001902,"schoolInSchoolYear":1001702,"branch":"a","name":"vestigingA","schoolYear":2026},
+{"id":1002102,"schoolInSchoolYear":1001802,"branch":"a","name":"vestigingA","schoolYear":2027}
+]

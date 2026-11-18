@@ -59,7 +59,7 @@ class Changes {
         }
 
         //TODO: remove this
-        window.ad = this.#appointments
+        globalThis.ad = this.#appointments
     }
 
 
@@ -105,7 +105,7 @@ class Changes {
 
         categories_names.forEach(category=>{
             category_results[category].forEach(appointment => {
-                if(appointment.lastModified > window.pretendLikeIts){
+                if(appointment.lastModified > globalThis.pretendLikeIts){
                     return;
                 }
                 modified_appointments[appointment.id] = appointment
@@ -229,7 +229,7 @@ class Changes {
         this.#lastLoaded = loaded
         this.#appointments = modified_objects_object
         //TODO: remove this
-        window.ad = this.#appointments
+        globalThis.ad = this.#appointments
         return changed
     }
 

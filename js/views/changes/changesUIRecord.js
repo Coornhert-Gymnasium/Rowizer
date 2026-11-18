@@ -18,26 +18,34 @@ export class ChangesUIRecord {
 
     }
 
-    #createElement() {
-        let el = document.createElement("div");
-        el.classList.add("appointment", this.appointment.type)
+    /**
+     * De CSS-klassen van dit item, zonder DOM: zo is het te testen.
+     * @return {string[]}
+     */
+    getClassNames() {
+        let classes = ["appointment", this.appointment.type]
         let this_morning = new Date(this.appointment.start * 1000)
         this_morning.setHours(1, 0, 0)
 
         if (this_morning.getTime() < (this.appointment.lastModified * 1000)) {
-            el.classList.add("new")
+            classes.push("new")
         }
+        if(!this.appointment.valid) {
+            classes.push('invalid');
+        }
+        if(this.appointment.cancelled) {
+            classes.push('cancelled');
+        }
+        return classes
+    }
 
+    #createElement() {
+        let el = document.createElement("div");
+        el.classList.add(...this.getClassNames())
 
         //for activities use real times
         el.style.setProperty('--start-hour', this.period_start);
         el.style.setProperty('--end-hour', this.period_end);
-        if(!this.appointment.valid) {
-            el.classList.add('invalid');
-        }
-        if(this.appointment.cancelled) {
-            el.classList.add('cancelled');
-        }
         el.setAttribute('data-appointment-id', this.appointment.id);
         el.innerText = this.getInnerText()
 

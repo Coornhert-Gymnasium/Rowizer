@@ -68,6 +68,26 @@ export class ChangesUiManager {
     }
 
     fillTable() {
+        this.collectChanges().forEach(change => {
+            let container = document.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
+            if (!container) {
+                // geen rij voor deze jaarlaag, bv. een genegeerde afdeling of een afdeling zonder leerjaar
+                return
+            }
+            try {
+                container.append(change.getElement())
+            } catch (e) {
+                console.warn("Could not show appointment " + change.appointment.id, e, change.appointment)
+            }
+
+        })
+    }
+
+    /**
+     * Bepaalt welke items op het bord komen, in welke volgorde. Raakt de DOM niet aan.
+     * @return {ChangesUIRecordClass[]}
+     */
+    collectChanges() {
         let changes = []
         // Hier wordt normaal gefilterd op of er een lesgroep gekoppeld is aan een afspraak. 
         // laat nu alles zien: exams en keuzelessen hebben geen afspraak
@@ -171,7 +191,7 @@ export class ChangesUiManager {
         //  dis komt anders als "vervalt" met de oude docent op het bord.
         //do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid), this)
 
-        changes.sort((a, b) => {
+        return changes.sort((a, b) => {
             if (a.appointment.type !== b.appointment.type) {
                 if (a.appointment.type === 'lesson') {
                     //activities voor lessen
@@ -187,18 +207,6 @@ export class ChangesUiManager {
                 }
             }
             return 0
-        }).forEach(change => {
-            let container = document.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
-            if (!container) {
-                // geen rij voor deze jaarlaag, bv. een genegeerde afdeling of een afdeling zonder leerjaar
-                return
-            }
-            try {
-                container.append(change.getElement())
-            } catch (e) {
-                console.warn("Could not show appointment " + change.appointment.id, e, change.appointment)
-            }
-
         })
     }
 
