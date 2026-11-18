@@ -83,6 +83,24 @@
             setInterval(window.rowizerWatchdogCheck, MINUTE)
         })()
     </script>
+    <script id="service-worker">
+        // Eigen bestanden ook zonder webhost (plan stap R.17); sw=0 in het adres zet dit uit.
+        (function () {
+            if (!("serviceWorker" in navigator)) {
+                return
+            }
+            var off = /(^|[?#&])sw=0(&|$)/.test(location.search + location.hash)
+            if (off) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    regs.forEach(function (reg) { reg.unregister() })
+                }).catch(function () {})
+                return
+            }
+            navigator.serviceWorker.register("sw.js").catch(function (e) {
+                console.warn("Service worker not registered", e)
+            })
+        })()
+    </script>
     <script src="js/script.js" type="module"></script>
     <script src="js/clock.js" type="module"></script>
 

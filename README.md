@@ -70,7 +70,31 @@ You are very welcome to use Rowizer using our Github-pages. Bear in mind that th
 |active| 07:00-17:00                        | | Time window in which the board refreshes; default 06:30-18:00. Outside it, and on days without lessons, the board keeps showing the last state and sends no requests to Zermelo. The first refresh happens right when the window starts. `off` refreshes around the clock. |
 |rememberToken| 1                        | | Stores the token in the browser (localStorage) and removes it from the address bar; afterwards the address without `token` is enough. A new token in the address replaces the stored one. Off by default: if the player does not keep storage, the setup screen appears. Note that on GitHub Pages all projects of the same account (`<account>.github.io`) share one localStorage, so any page there can read the stored token; only use this on a host of its own. |
 |scale| 1.2                        | | Makes everything on the screen larger or smaller (0.5 to 3) without browser zoom. Text already scales with the screen width; at 1 a busy day fits a 1920x1080 or 3840x2160 screen without scrolling. |
+|sw| 0                        | | Removes the service worker. Normally it keeps a copy of Rowizer's own files, so the board still starts when GitHub Pages is unreachable (it always tries the network first, so new versions arrive as usual). Opening the board once with `sw=0` switches that off on this screen. |
 |debug| 1                        | | Shows a diagnostics panel (requests, request budget, tasks, errors) and exposes `cm`, `zc`, `ad()` and `dc(date)` in the console. Never shows the token. |
+
+## Running on a Raspberry Pi
+Rowizer recovers from most problems by itself (lost network, Zermelo errors, a new day, a new version), but it cannot start the browser. Start Chromium so that it waits for the network and comes back after a crash. An example with a systemd user service in the desktop session (`~/.config/systemd/user/rowizer.service`, then `systemctl --user enable --now rowizer`); adjust the browser name (`chromium` or `chromium-browser`) and the session target to your setup:
+
+```ini
+[Unit]
+Description=Rowizer kiosk
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+# wait at most 2 minutes for the network; the page also copes without it ($$ is a literal $ in systemd)
+ExecStartPre=/bin/sh -c 'for i in $$(seq 60); do ping -c1 -W2 github.io >/dev/null 2>&1 && exit 0; sleep 2; done; exit 0'
+ExecStart=/usr/bin/chromium --kiosk --noerrdialogs --disable-session-crashed-bubble --disable-infobars "https://<your-pages-host>/Rowizer/#portal=...&token=..."
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target
+```
+
+- Set the time zone to Europe/Amsterdam (`timedatectl set-timezone Europe/Amsterdam`) and keep NTP on. A Pi has no battery-backed clock: until NTP succeeds the clock is wrong. Rowizer compares its clock with the web server and uses the server time if they differ more than 2 minutes.
+- Turn off screen blanking (for example `xset s off -dpms`, or in `raspi-config` → Display Options → Screen Blanking).
 
 ## Development
 There is no build step: the page loads the ES modules in `js/` directly.
