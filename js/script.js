@@ -59,7 +59,13 @@ window.zc = connector
 
 // Eén planner voor alle verversloops (plan stap R.10): elke 5 minuten, na een mislukte ronde
 // na een minuut, met een willekeurige start zodat schermen niet gelijk lopen.
-let scheduler = new Scheduler({onRound: () => updateStatus()})
+let scheduler = new Scheduler({onRound: task => {
+    // een geslaagde ronde haalt de rem van de waakhond (index.html)
+    if(task.failures === 0 && window.rowizerReloadOk){
+        window.rowizerReloadOk()
+    }
+    updateStatus()
+}})
 scheduler.listen()
 window.rowizerScheduler = scheduler
 
@@ -158,16 +164,21 @@ setInterval(()=> {
         let last_success = scheduler.task("changes")?.lastSuccess
         let healthy = zapi.session.health.state === "ok" && last_success && Date.now() - last_success < 15*60*1000
         if(healthy){
-            window.rowizerReload()
+            window.rowizerReload("nightly maintenance")
         } else {
             maintenance_at = Date.now() + 10*60*1000
         }
     }
 
-    // Zonder basisgegevens kan niets laden. De connector probeert het zelf opnieuw; alleen als
-    // dat na STARTUP_TIMEOUT nog niet gelukt is, herladen we de pagina.
-    if(!connector.isReady && Date.now() - started_at > STARTUP_TIMEOUT){
-        window.rowizerReload()
+    // Zonder basisgegevens kan niets laden. Heeft de connector een fout, dan probeert hij het zelf
+    // opnieuw (herladen helpt dan niet) en is er dus leven: hartslag voor de waakhond. Is er na
+    // STARTUP_TIMEOUT nog geen enkele laadpoging afgerond, dan hangt er iets: herladen.
+    if(!connector.isReady){
+        if(connector.loadError){
+            window.rowizerHeartbeat = Date.now()
+        } else if(Date.now() - started_at > STARTUP_TIMEOUT){
+            window.rowizerReload("startup stuck")
+        }
     }
     updateStatus()
 }, RETRY_INTERVAL)
