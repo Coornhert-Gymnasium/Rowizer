@@ -76,7 +76,9 @@ async function page(event) {
 async function file(event) {
     let cache = await caches.open(CACHE)
     let request = event.request
-    if (fromCache.has(event.clientId)) {
+    // no-store (de versiecontrole, stap 3.5) altijd eerst van het netwerk: zo merkt ook een pagina
+    // uit de cache dat de webhost terug is met een nieuwe versie, en herlaadt ze
+    if (fromCache.has(event.clientId) && request.cache !== "no-store") {
         let cached = await cache.match(request)
         if (cached) {
             return cached

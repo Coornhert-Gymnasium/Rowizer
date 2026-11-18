@@ -41,3 +41,19 @@ test("arraysEqual negeert volgorde en verandert de lijsten niet", () => {
     assert.deepEqual(a, ["men04", "huu"])
     assert.equal(arraysEqual(["a"], ["a", "b"]), false)
 })
+
+// review van de PR-reeks: movedTo (plan stap 3.3) telt mee bij het samenvoegen
+test("oude versies met en zonder verplaatsing worden niet samengevoegd", async () => {
+    let {mergeSubsequentAppointments} = await import("../js/zermelo/utils/mergeAppointments.js")
+    let base = {courses: ["wi"], subjects: ["wi"], groupsInDepartments: [1], teachers: ["vos"], appointmentLastModified: 5, valid: false, cancelled: false}
+    let onlyRoom = {...base, id: 1, startTimeSlot: 6, endTimeSlot: 6}
+    let moved = {...base, id: 2, startTimeSlot: 7, endTimeSlot: 7, movedTo: {startTimeSlot: 4, endTimeSlot: 4}}
+    let merged = mergeSubsequentAppointments([onlyRoom, moved])
+    assert.equal(merged.length, 2)
+    assert.deepEqual(merged.find(a => a.id === 2).movedTo, {startTimeSlot: 4, endTimeSlot: 4})
+
+    // gelijke movedTo (zelfde verplaatsing, oude stijl in losse uren): wel samen
+    let a = {...base, id: 3, startTimeSlot: 7, endTimeSlot: 7, movedTo: {startTimeSlot: 4, endTimeSlot: 5}}
+    let b = {...base, id: 4, startTimeSlot: 8, endTimeSlot: 8, movedTo: {startTimeSlot: 4, endTimeSlot: 5}}
+    assert.equal(mergeSubsequentAppointments([a, b]).length, 1)
+})

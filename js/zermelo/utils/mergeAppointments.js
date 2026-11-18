@@ -55,7 +55,9 @@ function mergeAppointments(appointments, comp_func, before_item_func = (original
 function mergeSubsequentAppointments(appointments){
     return mergeAppointments(
         appointments,
-        (a,b) => arraysEqual(a.courses, b.courses) && arraysEqual(a.subjects, b.subjects) && arraysEqual(a.groupsInDepartments, b.groupsInDepartments) && arraysEqual(a.teachers, b.teachers) && a.appointmentLastModified === b.appointmentLastModified && a.valid === b.valid && a.cancelled === b.cancelled,
+        // movedTo (plan stap 3.3) hoort erbij: een oude versie die alleen een ander lokaal kreeg, mag
+        // niet samen met een verplaatste oude versie één item worden
+        (a,b) => arraysEqual(a.courses, b.courses) && arraysEqual(a.subjects, b.subjects) && arraysEqual(a.groupsInDepartments, b.groupsInDepartments) && arraysEqual(a.teachers, b.teachers) && a.appointmentLastModified === b.appointmentLastModified && a.valid === b.valid && a.cancelled === b.cancelled && JSON.stringify(a.movedTo ?? null) === JSON.stringify(b.movedTo ?? null),
         (original,to_merge) => {
             original.endTimeSlot = to_merge.endTimeSlot
         },

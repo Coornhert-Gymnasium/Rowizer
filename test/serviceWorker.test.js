@@ -89,6 +89,8 @@ test("pagina uit de cache: al haar bestanden ook, geen mix van oud en nieuw", as
     assert.equal((await w.handle(get("js/script.js"), {clientId: "c2"})).body, "oud", "uit de cache, niet van het netwerk")
     // een andere pagina die gewoon van het netwerk kwam, krijgt de nieuwe bestanden
     assert.equal((await w.handle(get("js/script.js"), {clientId: "c3"})).body, "nieuw")
+    // de versiecontrole (no-store) van de pagina uit de cache gaat wel naar het netwerk
+    assert.equal((await w.handle({...get("js/version.js"), cache: "no-store"}, {clientId: "c2"})).body, "nieuw")
 })
 
 test("Zermelo, HEAD-verzoeken en foutantwoorden blijven buiten de worker of de cache", async () => {
