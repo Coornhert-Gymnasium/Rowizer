@@ -83,6 +83,12 @@ test("nog aan het opstarten zonder fout: niets", () => {
     assert.equal(s.bar, null)
 })
 
+test("tijden op het scherm volgen de gecorrigeerde klok", () => {
+    let s = status({clockOffset: 3*60*MINUTE})
+    assert.equal(s.updated, "bijgewerkt 13:35")
+    assert.equal(status().updated, "bijgewerkt 10:35")
+})
+
 test("afwezigen: na 30 min grijs met stand, na 2 uur verbergen", () => {
     assert.equal(status({now: t1035 + 20*MINUTE, changes: {lastSuccess: t1035 + 20*MINUTE}}).absences, "fresh")
     let stale = status({now: t1035 + 31*MINUTE, changes: {lastSuccess: t1035 + 31*MINUTE}})

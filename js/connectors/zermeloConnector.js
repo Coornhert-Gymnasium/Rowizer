@@ -1,5 +1,6 @@
 import {ZermeloError} from "../zermelo/utils/errors.js";
 import {setDayTables} from "../diagnostics.js";
+import {today as appToday} from "../appTime.js";
 
 const STARTUP_RETRY_DELAY = 60*1000
 // Basisgegevens (groepen, leerlingen) kunnen overdag veranderen.
@@ -67,9 +68,8 @@ export default class ZermeloConnector {
             }
             console.warn("Invalid date '" + date + "', showing today")
         }
-        let today = new Date()
-        today.setHours(0, 0, 0, 0)
-        return today
+        // vandaag volgens de gecorrigeerde klok (plan stap R.6)
+        return appToday()
     }
 
     // Opstarten: blijven proberen tot de eerste momentopname er is, zonder de pagina te herladen.

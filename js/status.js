@@ -15,8 +15,11 @@ export const NEUTRAL_TEXT = "Roosterwijzigingen tijdelijk niet beschikbaar"
 export const NO_LESSONS_TEXT = "Vandaag geen lessen"
 const CONNECTION_KINDS = ["network", "server", "rate", "data"]
 
+// Tijden op het scherm volgen de gecorrigeerde klok (plan stap R.6); zie computeStatus.
+let displayOffset = 0
+
 function time(ms) {
-    return new Date(ms).toLocaleTimeString("nl-NL", {hour: "2-digit", minute: "2-digit"})
+    return new Date(ms + displayOffset).toLocaleTimeString("nl-NL", {hour: "2-digit", minute: "2-digit"})
 }
 
 /** Korte code van een fout, bv. "auth 401", "network", "render". */
@@ -41,11 +44,13 @@ export function errorCode(error) {
  * @param input.changes taak uit de planner ({addedAt, lastSuccess, lastError}) of undefined
  * @param input.changesFailure "load" | "render" | null (ChangesUiManager.lastFailure)
  * @param input.absences taak uit de planner, of undefined als afwezigen uit staan
+ * @param input.clockOffset afwijking van de klok van dit scherm, voor het tonen van tijden
  * @return {{bar: null|{level: string, text: string}, boardMessage: string|null, code: string|null,
  *           updated: string|null, absences: "fresh"|"stale"|"hidden", absencesNote: string|null}}
  */
 export function computeStatus(input) {
     let {now, isReady, loadError, health, changes, changesFailure, absences} = input
+    displayOffset = input.clockOffset || 0
     let result = {bar: null, boardMessage: null, code: null, updated: null, absences: "fresh", absencesNote: null}
 
     let healthError = health && health.state === "down" ? health.lastError : null

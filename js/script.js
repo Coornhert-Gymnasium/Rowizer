@@ -15,6 +15,9 @@ import {computeStatus} from "./status.js";
 import {checkToken, tokenNote} from "./tokenCheck.js";
 import {readSettings} from "./settings.js";
 import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
+import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
+import {measureClockOffset, clockNote} from "./clockCheck.js";
+import diagnostics from "./diagnostics.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -29,6 +32,26 @@ console.log("Rowizer loaded, version " + VERSION)
 // Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
 let params = readSettings(window.location)
 let param_debug = params.get("debug") === "1"
+
+// Klok controleren voordat we bepalen welke dag het is (plan stap R.6). Hoogstens 5 seconden:
+// zonder antwoord gaan we uit van de eigen klok.
+let checkClock = async function(){
+    let offset = await Promise.race([
+        measureClockOffset({url: location.pathname}),
+        new Promise(resolve => setTimeout(() => resolve(null), 5000)),
+    ])
+    if(offset !== null){
+        diagnostics.clockOffset = offset
+        if(setClockOffset(offset)){
+            console.warn("Clock of this screen is off by " + Math.round(offset/1000) + " s, using the web server's time")
+        }
+    }
+}
+try {
+    await checkClock()
+} catch (e) {
+    console.warn("Could not check the clock", e)
+}
 
 //portal: naam vh portal, token: api-token, branch: branchcode (vestigingscode)
 
@@ -89,6 +112,7 @@ let updateStatus = function(){
         changes: scheduler.task("changes"),
         changesFailure: changesUiManager.lastFailure,
         absences: absences_allowed ? scheduler.task("absences") : undefined,
+        clockOffset: clockOffset(),
     })
 
     let bar = document.querySelector("#status")
@@ -100,7 +124,7 @@ let updateStatus = function(){
         changesUiManager.showMessage(status.boardMessage)
     }
 
-    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), status.updated, VERSION].filter(Boolean).join(" · ")
+    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), clockNote(clockOffset()), status.updated, VERSION].filter(Boolean).join(" · ")
 
     let absences_container = document.querySelector("#absences-container")
     absences_container.classList.toggle("stale", status.absences === "stale")
@@ -150,14 +174,15 @@ let rollover = new DayRollover({
     currentDate: () => connector.date,
     fixedDate: !!param_date,
     onNewDay: switchDay,
+    now: appNow,
 })
 
 // Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
 // Zermelo bereikbaar is, anders later opnieuw. Vervalt zodra stap 3.5 (versiecontrole) er is.
 let nextMaintenance = function(){
-    let at = new Date()
+    let at = new Date(appNow())
     at.setHours(MAINTENANCE_HOUR, 0, 0, 0)
-    if(at.getTime() <= Date.now()){
+    if(at.getTime() <= appNow()){
         at.setDate(at.getDate() + 1)
     }
     return at.getTime() + Math.floor(Math.random()*60*60*1000)
@@ -171,13 +196,13 @@ setInterval(()=> {
     rollover.check()
     connector.refreshIfStale()
 
-    if(Date.now() >= maintenance_at){
+    if(appNow() >= maintenance_at){
         let last_success = scheduler.task("changes")?.lastSuccess
         let healthy = zapi.session.health.state === "ok" && last_success && Date.now() - last_success < 15*60*1000
         if(healthy){
             window.rowizerReload("nightly maintenance")
         } else {
-            maintenance_at = Date.now() + 10*60*1000
+            maintenance_at = appNow() + 10*60*1000
         }
     }
 
@@ -235,6 +260,13 @@ connector.waitUntilReady().then(()=>{
         token_info = await checkToken(zapi.session)
         return true
     }, {interval: 24*60*60*1000, retryInterval: 60*60*1000})
+
+    // Klok elk uur opnieuw controleren; na een correctie ziet de dagwissel een andere dag.
+    scheduler.add("clock", async ()=>{
+        await checkClock()
+        rollover.check()
+        return true
+    }, {interval: 60*60*1000, retryInterval: 15*60*1000})
 
     // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
     // stroomstoring) lopen daarna niet gelijk.
