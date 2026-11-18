@@ -83,3 +83,36 @@ test("tijdelijke storing die overgaat: gewoon resultaat", async () => {
     assert.equal(error, null)
     assert.equal(calls, 2)
 })
+
+// S6 uit de storingsmatrix: een verzoek dat blijft hangen
+test("hangend verzoek: na de time-out afgebroken, soort network, opnieuw geprobeerd", async () => {
+    let signals = []
+    let hang = (url, options) => new Promise((resolve, reject) => {
+        signals.push(options.signal)
+        options.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))
+    })
+    let calls = 0
+    let fetch = async (url, options) => { calls++; return hang(url, options) }
+    let clock = virtualClock()
+    let s = new Session("demo", "token", {fetch, retryDelays: [1, 1], now: clock.now, sleep: clock.sleep, store: memoryStore(), requestTimeout: 20})
+    let started = Date.now()
+    await assert.rejects(s.request("branches"), e => e.kind === "network" && /timeout/.test(e.message))
+    assert.equal(calls, 3, "1 poging + 2 herhalingen")
+    assert.ok(signals.every(sig => sig.aborted))
+    assert.ok(Date.now() - started < 2000)
+    assert.equal(s.health.state, "down", "daarna als S1: storing met proefverzoeken")
+})
+
+test("hangend verzoek dat daarna lukt: geen fout", async () => {
+    let n = 0
+    let fetch = async (url, options) => {
+        n++
+        if (n === 1) {
+            return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => reject(new Error("aborted"))))
+        }
+        return zermeloResponse(200, [{id: 7}])
+    }
+    let clock = virtualClock()
+    let s = new Session("demo", "token", {fetch, retryDelays: [1, 1], now: clock.now, sleep: clock.sleep, store: memoryStore(), requestTimeout: 20})
+    assert.deepEqual(await s.request("branches"), [{id: 7}])
+})

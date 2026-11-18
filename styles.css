@@ -235,6 +235,10 @@ div.appointment.moved{
     color: rgb(255,200,60);
     padding: 0 1em;
 }
+/* bewaarde stand bij het opstarten (plan stap R.16): rustig, wit */
+#status.info {
+    color: rgb(235,235,235);
+}
 /* langer dan een uur geen verse gegevens: over de volle breedte, rood */
 #status.error {
     position: fixed;

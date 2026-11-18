@@ -22,6 +22,11 @@ function time(ms) {
     return new Date(ms + displayOffset).toLocaleTimeString("nl-NL", {hour: "2-digit", minute: "2-digit"})
 }
 
+/** Bewaarde stand op het bord (plan stap R.16), nog niet ververst en (nog) zonder fout. */
+function restoredNote(restoredAt) {
+    return {level: "info", text: "Bewaarde stand van " + time(restoredAt) + " – wordt bijgewerkt"}
+}
+
 /** Korte code van een fout, bv. "auth 401", "network", "render". */
 export function errorCode(error) {
     if (!error) {
@@ -45,6 +50,7 @@ export function errorCode(error) {
  * @param input.changesFailure "load" | "render" | null (ChangesUiManager.lastFailure)
  * @param input.absences taak uit de planner, of undefined als afwezigen uit staan
  * @param input.clockOffset afwijking van de klok van dit scherm, voor het tonen van tijden
+ * @param input.restoredAt tijdstip van de bewaarde stand op het bord (plan stap R.16), of null
  * @param input.resting rusttijd (plan stap 3.2): er wordt bewust niet ververst
  * @return {{bar: null|{level: string, text: string}, boardMessage: string|null, code: string|null,
  *           updated: string|null, absences: "fresh"|"stale"|"hidden", absencesNote: string|null}}
@@ -59,11 +65,19 @@ export function computeStatus(input) {
     let changesError = changesFailure && typeof changesFailure === "object" ? changesFailure : null
 
     if (!isReady) {
+        let noSchoolYear = loadError && loadError.kind === "config" && loadError.reason === "school-year-unknown"
+        // Bewaarde stand van vandaag op het bord (plan stap R.16): die laten staan, met de rode balk.
+        if (loadError && input.restoredAt && !noSchoolYear) {
+            result.code = errorCode(loadError)
+            let connection = CONNECTION_KINDS.includes(loadError.kind)
+            result.bar = {level: "error", text: (connection ? "Geen verbinding met Zermelo" : NEUTRAL_TEXT) + " – stand van " + time(input.restoredAt)}
+            return result
+        }
         if (loadError) {
             result.code = errorCode(loadError)
-            result.boardMessage = loadError.kind === "config" && loadError.reason === "school-year-unknown"
-                ? NO_LESSONS_TEXT
-                : NEUTRAL_TEXT
+            result.boardMessage = noSchoolYear ? NO_LESSONS_TEXT : NEUTRAL_TEXT
+        } else if (input.restoredAt) {
+            result.bar = restoredNote(input.restoredAt)
         }
         return result
     }
@@ -72,7 +86,9 @@ export function computeStatus(input) {
     if (lastSuccess) {
         result.updated = "bijgewerkt " + time(lastSuccess)
     }
-    // Zonder geslaagde ronde telt de tijd vanaf het begin van de taak.
+    // Zonder geslaagde ronde telt de tijd vanaf het begin van de taak. Staat er een bewaarde stand
+    // (plan stap R.16), dan is dat de stand die het scherm toont.
+    let restored = !lastSuccess && input.restoredAt
     let age = now - (lastSuccess || (changes && changes.addedAt) || now)
     let cause = healthError || changesError || (changes && changes.lastError) || (changesFailure === "render" ? "render" : null)
     if (cause) {
@@ -85,11 +101,15 @@ export function computeStatus(input) {
         return result
     }
 
-    if (cause && age > STALE_WARN) {
+    if (cause && (age > STALE_WARN || restored)) {
         // alleen bij een echte verbindingsfout noemen we de verbinding; anders neutraal
         let connection = typeof cause === "object" && CONNECTION_KINDS.includes(cause.kind)
-        let text = (connection ? "Geen verbinding met Zermelo" : NEUTRAL_TEXT) + (lastSuccess ? " – stand van " + time(lastSuccess) : "")
-        result.bar = {level: age > STALE_ERROR ? "error" : "warn", text}
+        let shownFrom = lastSuccess || input.restoredAt
+        let text = (connection ? "Geen verbinding met Zermelo" : NEUTRAL_TEXT) + (shownFrom ? " – stand van " + time(shownFrom) : "")
+        result.bar = {level: age > STALE_ERROR || restored ? "error" : "warn", text}
+    } else if (restored) {
+        // nog geen eigen ronde, maar ook geen fout: zeggen dat dit een bewaarde stand is
+        result.bar = restoredNote(input.restoredAt)
     }
 
     if (absences && absences.lastSuccess) {

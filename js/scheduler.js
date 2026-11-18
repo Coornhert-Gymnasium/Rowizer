@@ -2,11 +2,12 @@
  * Eén planner voor alle verversloops (plan stap R.10).
  *
  * Per taak: een interval, een korter interval na een mislukte ronde, de laatste geslaagde tijd
- * en de laatste fout. Taken starten met een willekeurige vertraging, zodat schermen niet gelijk
- * lopen. Een ronde begint pas als de vorige van dezelfde taak klaar is. Na elke afgeronde ronde
+ * en de laatste fout. Taken starten binnen 2 s; daarna krijgt elk interval ±10% spreiding, zodat
+ * schermen die tegelijk opstarten (bv. na een stroomstoring) snel uiteenlopen. Een ronde begint pas als de vorige van dezelfde taak klaar is. Na elke afgeronde ronde
  * (geslaagd of niet) wordt de hartslag bijgewerkt; de waakhond in index.html kijkt daarnaar.
  */
 const EVENT_MIN_INTERVAL = 60*1000
+const INTERVAL_JITTER = 0.1
 
 export default class Scheduler {
     #tasks = []
@@ -14,17 +15,21 @@ export default class Scheduler {
 
     /**
      * @param options.now, options.random, options.setTimeout, options.clearTimeout voor de tests
-     * @param options.startDelay maximale willekeurige startvertraging, standaard 20 s
+     * @param options.startDelay maximale willekeurige startvertraging, standaard 2 s
      * @param options.onRound (task) => void, na elke afgeronde ronde
+     * @param options.beforeEvent () => void, bij elke gebeurtenis (scherm aan, netwerk terug), ook binnen de minuut
      */
     constructor(options = {}) {
         this.now = options.now || (() => Date.now())
         this.random = options.random || Math.random
         this.setTimeout = options.setTimeout || ((fn, ms) => setTimeout(fn, ms))
         this.clearTimeout = options.clearTimeout || (id => clearTimeout(id))
-        this.startDelay = options.startDelay ?? 20*1000
+        // Kort: het eerste bord moet er snel staan. Dat schermen niet gelijk lopen, regelt de
+        // spreiding op de latere rondes (INTERVAL_JITTER).
+        this.startDelay = options.startDelay ?? 2*1000
         this.onRound = options.onRound || (() => {})
         this.isResting = options.isResting || (() => false)
+        this.beforeEvent = options.beforeEvent || (() => {})
         this.heartbeat = null
     }
 
@@ -84,6 +89,12 @@ export default class Scheduler {
      * @return {boolean} of er ververst wordt
      */
     runAfterEvent() {
+        // eerst bv. de dagwissel controleren: na een nacht uit moet de nieuwe dag geladen worden
+        try {
+            this.beforeEvent()
+        } catch (e) {
+            console.error(e)
+        }
         if (this.lastEventRun && this.now() - this.lastEventRun < EVENT_MIN_INTERVAL) {
             return false
         }
@@ -104,6 +115,11 @@ export default class Scheduler {
                 }
             })
         }
+    }
+
+    /** Interval met ±10% spreiding, bv. 5 min ± 30 s: schermen die tegelijk starten, lopen snel uiteen. */
+    #spread(interval) {
+        return Math.round(interval * (1 + (this.random() - 0.5) * 2 * INTERVAL_JITTER))
     }
 
     #schedule(task, delay) {
@@ -157,7 +173,7 @@ export default class Scheduler {
         if (globalThis.window) {
             window.rowizerHeartbeat = this.heartbeat
         }
-        this.#schedule(task, ok ? task.interval : task.retryInterval)
+        this.#schedule(task, this.#spread(ok ? task.interval : task.retryInterval))
         try {
             this.onRound(task)
         } catch (e) {

@@ -17,10 +17,11 @@ import {readSettings, rememberToken, urlWithoutToken} from "./settings.js";
 import {missingSettings, showSetupScreen} from "./setupScreen.js";
 import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
-import {measureClockOffset, clockNote} from "./clockCheck.js";
+import {measureClockOffset, clockNote, timeZoneNote} from "./clockCheck.js";
 import diagnostics from "./diagnostics.js";
 import {parseWindow, isResting} from "./activeWindow.js";
 import {fetchVersion, shouldReload, triedStore} from "./versionCheck.js";
+import {storageWorks, saveBoard, loadBoard, sanitize} from "./boardCache.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -29,8 +30,6 @@ const MAINTENANCE_HOUR = 3
 
 installErrorHandlers()
 console.log("Rowizer loaded, version " + VERSION)
-//TODO: remove this
-//window.pretendLikeIts = 1717452000000/1000;
 
 // Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
 let params = readSettings(window.location)
@@ -41,6 +40,10 @@ if(local_storage && rememberToken(params, local_storage)){
     history.replaceState(null, "", urlWithoutToken(window.location.href))
 }
 let param_debug = params.get("debug") === "1"
+// Met debug=1 en pretend=<epoch in seconden> negeert het bord wijzigingen van na dat moment.
+if(param_debug && Number(params.get("pretend"))){
+    window.pretendLikeIts = Number(params.get("pretend"))
+}
 
 // Grootte van alles op het scherm bijstellen zonder browserzoom (plan stap 2.1), bv. scale=1.2.
 let param_scale = parseFloat(params.get("scale"))
@@ -59,6 +62,13 @@ if(missing.length){
     window.rowizerHeartbeat = Date.now()
     setInterval(() => { window.rowizerHeartbeat = Date.now() }, 60*1000)
     await new Promise(() => {})
+}
+
+// Tijdzone van dit scherm (plan stap R.6): alleen melden, rechtsonder en in de diagnose.
+let time_zone_note = timeZoneNote()
+if(time_zone_note){
+    console.warn("This screen is not on Europe/Amsterdam time (" + time_zone_note + "): today and the current period may be wrong")
+    diagnostics.timeZone = time_zone_note
 }
 
 // Klok controleren voordat we bepalen welke dag het is (plan stap R.6). Hoogstens 5 seconden:
@@ -113,8 +123,47 @@ var absencesUiManager = new AbsencesUiManager(document.querySelector("#absences-
 var outofoffice = new OutOfOffice(connector)
 var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#outofoffice-inner-container"),connector,outofoffice)
 
-window.cm = changesUiManager
-window.zc = connector
+// Bewaarde stand van vandaag meteen tonen (plan stap R.16): bij een start zonder Zermelo is dat
+// beter dan een leeg bord. Komen er verse gegevens, dan vervangen die de bewaarde stand.
+let board_storage = local_storage && storageWorks(local_storage) ? local_storage : null
+let board_scope = params.get("portal") + "|" + (param_branch || "")
+let restored_at = null
+if(board_storage){
+    let cached = loadBoard(board_storage, {day: connector.date.toDateString(), scope: board_scope})
+    if(cached){
+        try {
+            document.querySelector("#content-container").replaceChildren(sanitize(cached.board))
+            absencesUiManager.element.replaceChildren(sanitize(cached.absences))
+            document.querySelector("#absences-container").style.display = absencesUiManager.element.children.length ? null : "none"
+            restored_at = cached.savedAt
+            console.info("Showing the saved board of " + new Date(cached.savedAt).toLocaleTimeString("nl-NL") + " until fresh data arrives")
+        } catch (e) {
+            console.warn("Could not show the saved board", e)
+        }
+    }
+}
+let saveShownBoard = function(){
+    // De stand is die van de laatste geslaagde wijzigingenronde, ook als dit na de afwezigen gebeurt.
+    // Zelfde klok als de status (Date.now): die telt de klokcorrectie er bij het tonen zelf bij.
+    let changes_success = scheduler.task("changes")?.lastSuccess
+    if(!board_storage || !changes_success || !changesUiManager.tableReady || !connector.isCurrent){
+        return
+    }
+    saveBoard(board_storage, {
+        day: connector.date.toDateString(),
+        scope: board_scope,
+        savedAt: changes_success,
+        board: document.querySelector("#content-container").innerHTML,
+        absences: absencesUiManager.element.innerHTML,
+    })
+}
+
+// Hulpmiddelen in de console, alleen met debug=1 (plan stap 4.2)
+if(param_debug){
+    window.cm = changesUiManager
+    window.zc = connector
+    window.ad = () => changesManager.appointments
+}
 
 // Rusttijd (plan stap 3.2): buiten het venster of op een dag zonder lessen niet verversen.
 let resting = () => isResting({
@@ -122,6 +171,7 @@ let resting = () => isResting({
     now: appNow(),
     isReady: connector.isReady && connector.isCurrent,
     lessons: connector.isReady ? connector.getTodayTimeSlots().length : 0,
+    holiday: connector.isReady ? connector.holiday : null,
 })
 let was_resting = false
 
@@ -131,6 +181,10 @@ let scheduler = new Scheduler({isResting: resting, onRound: task => {
     // een geslaagde ronde haalt de rem van de waakhond (index.html)
     if(task.failures === 0 && window.rowizerReloadOk){
         window.rowizerReloadOk()
+    }
+    // wat er nu staat bewaren voor een start zonder Zermelo (plan stap R.16)
+    if(task.failures === 0 && (task.name === "changes" || task.name === "absences")){
+        saveShownBoard()
     }
     updateStatus()
 }})
@@ -153,6 +207,7 @@ let updateStatus = function(){
         absences: absences_allowed ? scheduler.task("absences") : undefined,
         clockOffset: clockOffset(),
         // alleen als de laatste ronde slaagde: een storing blijft ook in rusttijd zichtbaar
+        restoredAt: restored_at,
         resting: resting() && scheduler.task("changes")?.failures === 0 && !!scheduler.task("changes")?.lastSuccess,
     })
 
@@ -160,12 +215,13 @@ let updateStatus = function(){
     bar.textContent = status.bar ? status.bar.text : ""
     bar.style.display = status.bar ? null : "none"
     bar.classList.toggle("error", !!status.bar && status.bar.level === "error")
+    bar.classList.toggle("info", !!status.bar && status.bar.level === "info")
 
     if(status.boardMessage && !connector.isReady){
         changesUiManager.showMessage(status.boardMessage)
     }
 
-    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), clockNote(clockOffset()), status.updated, VERSION].filter(Boolean).join(" · ")
+    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), clockNote(clockOffset()), time_zone_note, status.updated, VERSION].filter(Boolean).join(" · ")
 
     let absences_container = document.querySelector("#absences-container")
     absences_container.classList.toggle("stale", status.absences === "stale")
@@ -193,6 +249,7 @@ let showTitle = function(){
 let switchDay = async function(date){
     console.info("New day: " + date.toDateString())
     let loading = connector.switchDay(date)
+    restored_at = null
     showTitle()
     changesManager.reset()
     changesUiManager.showMessage("Rooster van " + date.toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"}) + " wordt geladen")
@@ -209,7 +266,9 @@ let switchDay = async function(date){
     }
     scheduler.runNow()
 }
-window.dc = switchDay
+if(param_debug){
+    window.dc = switchDay
+}
 
 let rollover = new DayRollover({
     currentDate: () => connector.date,
@@ -217,6 +276,8 @@ let rollover = new DayRollover({
     onNewDay: switchDay,
     now: appNow,
 })
+// Scherm weer aan na een nacht (S14): eerst de dag controleren, dan pas verversen.
+scheduler.beforeEvent = () => rollover.check()
 
 // Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
 // Zermelo bereikbaar is, anders later opnieuw. Een nieuwe versie komt sinds stap 3.5 al binnen een
@@ -348,8 +409,8 @@ connector.waitUntilReady().then(()=>{
         return true
     }, {interval: 15*60*1000, retryInterval: 15*60*1000})
 
-    // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
-    // stroomstoring) lopen daarna niet gelijk.
+    // Start binnen 2 s; de latere rondes krijgen ±10% spreiding, zodat schermen die tegelijk
+    // opstarten (bv. na een stroomstoring) daarna niet gelijk lopen.
     scheduler.start()
 })
 

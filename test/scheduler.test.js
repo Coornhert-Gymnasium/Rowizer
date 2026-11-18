@@ -28,13 +28,24 @@ function scheduler(timers, options = {}) {
         random: () => 0.5, ...options})
 }
 
-test("taken starten met een willekeurige vertraging tot 20 s", () => {
+test("taken starten binnen 2 s: het eerste bord moet er snel staan", () => {
     let timers = fakeTimers()
     let s = scheduler(timers)
     s.add("changes", async () => true)
     s.add("absences", async () => true)
     s.start()
-    assert.deepEqual(timers.delays(), [10000, 10000])
+    assert.deepEqual(timers.delays(), [1000, 1000])
+})
+
+test("latere rondes met ±10% spreiding, zodat schermen niet gelijk lopen", async () => {
+    for (const [random, expected] of [[0, 270000], [0.5, 300000], [1, 330000]]) {
+        let timers = fakeTimers()
+        let s = scheduler(timers, {random: () => random})
+        s.add("changes", async () => true, {interval: 300000})
+        s.start()
+        await timers.fireAll()
+        assert.deepEqual(timers.delays(), [expected])
+    }
 })
 
 test("geslaagd: volgende ronde na het interval, mislukt: na het retry-interval", async () => {
@@ -106,4 +117,35 @@ test("onRound wordt na elke ronde aangeroepen", async () => {
     s.runNow()
     await new Promise(resolve => setImmediate(resolve))
     assert.deepEqual(rounds, ["changes"])
+})
+
+// S14 uit de storingsmatrix: scherm weer aan
+test("gebeurtenis: eerst beforeEvent (dagwissel), ook binnen de minuut", async () => {
+    let timers = fakeTimers()
+    let order = []
+    let s = scheduler(timers, {beforeEvent: () => order.push("dag")})
+    s.add("changes", async () => { order.push("ververs"); return true })
+    s.start()
+    assert.equal(s.runAfterEvent(), true)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(s.runAfterEvent(), false, "binnen de minuut niet nog eens verversen")
+    assert.deepEqual(order, ["dag", "ververs", "dag"])
+})
+
+// S15 (deels): na heel veel rondes nog steeds één timer per taak
+test("veel rondes: geen oplopend aantal timers", async () => {
+    let timers = fakeTimers()
+    let s = scheduler(timers)
+    let n = 0
+    s.add("changes", async () => (++n % 7) !== 0)
+    s.add("absences", async () => { throw new Error("x") })
+    s.start()
+    for (let i = 0; i < 500; i++) {
+        await timers.fireAll()
+        assert.equal(timers.timers.size, 2)
+    }
+    s.runNow()
+    s.runAfterEvent()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(timers.timers.size, 2)
 })

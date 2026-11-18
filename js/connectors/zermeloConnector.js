@@ -118,6 +118,14 @@ export default class ZermeloConnector {
     get departments(){
         return this.#current?.departments
     }
+    /** Naam van de vakantie of vrije dag van de getoonde dag, of null (plan §5 bij stap 3.2). */
+    get holiday(){
+        let holidays = this.#current?.holidays || []
+        let d = this.#date
+        let key = String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0")
+        let found = holidays.find(h => h.start <= key && key <= h.end)
+        return found ? found.name : null
+    }
 
     getGroupInDepartment(id){
         return this.#current?.groupsInDepartment[id]
@@ -224,6 +232,24 @@ export default class ZermeloConnector {
     }
 
     /**
+     * Vakanties en vrije dagen (plan §5 bij stap 3.2). Niet nodig voor het bord: een fout, bv. een
+     * token zonder dit recht, blokkeert niets.
+     */
+    async #loadHolidays(schoolInSchoolYear){
+        try {
+            return (await this.api.session.request("holidays", {
+                schoolInSchoolYear,
+                fields: ["id", "name", "start", "end"],
+            }))
+                .filter(h => h && typeof h.name === "string" && /^\d{8}$/.test(h.start) && /^\d{8}$/.test(h.end))
+                .map(h => Object.freeze({name: h.name, start: h.start, end: h.end}))
+        } catch (e) {
+            console.warn("Holidays not available, continuing without", e)
+            return []
+        }
+    }
+
+    /**
      * Haalt alle basisgegevens op voor een datum. Verandert niets aan de connector.
      * @return {Promise<object>} bevroren momentopname
      */
@@ -257,10 +283,28 @@ export default class ZermeloConnector {
         }
         let branchOfSchool = branchesOfSchools[branches_keys[0]]
 
-        let departments = await api.departmentsOfBranches.get({
-            branchOfSchool: branchOfSchool.id,
-            fields: ['id', 'code', 'educationType', 'educations', 'weekTimeTable', 'yearOfEducation']
-        })
+        // De rest hangt alleen van de vestiging en het schooljaar af: tegelijk ophalen (de sessie
+        // bewaakt hoeveel er tegelijk lopen). Verwerken gebeurt hieronder, in de oude volgorde.
+        let schoolInSchoolYear = branchOfSchool.schoolInSchoolYear
+        let [departments, groupsInDepartment, studentsInDepartments, timeslotNames, weekTimeTables, holidays] = await Promise.all([
+            api.departmentsOfBranches.get({
+                branchOfSchool: branchOfSchool.id,
+                fields: ['id', 'code', 'educationType', 'educations', 'weekTimeTable', 'yearOfEducation']
+            }),
+            api.groupInDepartments.get({
+                branchOfSchool: branchOfSchool.id,
+                fields: ['id', 'departmentOfBranch', 'name', 'extendedName', "isMainGroup", "isMentorGroup"]
+            }),
+            api.studentsInDepartments.get({
+                schoolInSchoolYear,
+                fields: ['student', 'departmentOfBranch', 'mentorGroup']
+            }),
+            api.timeslotNames.get({schoolInSchoolYear}),
+            // Eén rij per afdeling, met per dag de lesuren erin (code, start, end, rank); de aparte
+            // verzoeken naar timeslots en daytimetables zijn daardoor niet meer nodig (plan stap R.5).
+            api.realizedweektimetables.get({schoolInSchoolYear, week}),
+            this.#loadHolidays(schoolInSchoolYear),
+        ])
         let yearsOfEducation = {}
         Object.values(departments).forEach(department => {
             department.mainGroupsInDepartment = []
@@ -274,10 +318,6 @@ export default class ZermeloConnector {
             }
         })
 
-        let groupsInDepartment = await api.groupInDepartments.get({
-            branchOfSchool: branchOfSchool.id,
-            fields: ['id', 'departmentOfBranch', 'name', 'extendedName', "isMainGroup", "isMentorGroup"]
-        })
         Object.values(groupsInDepartment).forEach(group => {
             if (group.isMentorGroup) {
                 group.students = []
@@ -293,10 +333,6 @@ export default class ZermeloConnector {
             department.groupsInDepartment.push(group.id)
         })
 
-        let studentsInDepartments = await api.studentsInDepartments.get({
-            schoolInSchoolYear: branchOfSchool.schoolInSchoolYear,
-            fields: ['student', 'departmentOfBranch', 'mentorGroup']
-        })
         Object.values(studentsInDepartments).forEach(student => {
             // de mentorgroep kan bij een andere vestiging horen
             let mentor_group = groupsInDepartment[student.mentorGroup]
@@ -305,19 +341,15 @@ export default class ZermeloConnector {
             }
         })
 
-        let timeslotNames = await api.timeslotNames.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear})
-
-        // Eén rij per afdeling, met per dag de lesuren erin (code, start, end, rank); de aparte
-        // verzoeken naar timeslots en daytimetables zijn daardoor niet meer nodig (plan stap R.5).
-        let realizedWeekTimeTables = (await api.realizedweektimetables.get({schoolInSchoolYear: branchOfSchool.schoolInSchoolYear, week: week}))
-            .filter(row => {
-                let department = departments[row.departmentOfBranch]
-                return department && !this.#options.ignoreDepartmentCodes.includes(department.code)
-            })
+        let realizedWeekTimeTables = weekTimeTables.filter(row => {
+            let department = departments[row.departmentOfBranch]
+            return department && !this.#options.ignoreDepartmentCodes.includes(department.code)
+        })
 
         return Object.freeze({
             loadedAt: this.#now(),
             forDate: date.toDateString(),
+            holidays,
             schoolYear,
             week,
             branch,

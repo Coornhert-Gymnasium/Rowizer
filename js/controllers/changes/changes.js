@@ -1,21 +1,11 @@
-import ChangedRecordHolder from "./lib/changedRecordHolder.js";
-import {mergeSubsequentAppointments, arraysEqual} from "../../zermelo/utils/mergeAppointments.js";
+import {mergeSubsequentAppointments} from "../../zermelo/utils/mergeAppointments.js";
 import {countOutOfGrid, countUnknownReference} from "../../diagnostics.js";
 import {linkMovedLessons} from "./movedLessons.js";
+import {appointmentTargets} from "./targets.js";
 
 class Changes {
-    #date;
     #appointments;
     #lastLoaded;
-
-
-    #schoolInYear
-
-    //afdeling-jaarlaag (dus A3 is 1 department)
-
-
-    //klassen en clusters
-
     #appointmentCategories;
     #mergeMultipleHourSpan;
 
@@ -59,9 +49,6 @@ class Changes {
             }
 
         }
-
-        //TODO: remove this
-        globalThis.ad = this.#appointments
     }
 
 
@@ -107,7 +94,8 @@ class Changes {
 
         categories_names.forEach(category=>{
             category_results[category].forEach(appointment => {
-                if(appointment.lastModified > globalThis.pretendLikeIts){
+                // alleen met debug=1: doen alsof het eerder is (zie script.js)
+                if(globalThis.pretendLikeIts && appointment.lastModified > globalThis.pretendLikeIts){
                     return;
                 }
                 modified_appointments[appointment.id] = appointment
@@ -261,9 +249,14 @@ class Changes {
         let loaded = JSON.stringify(modified_appointments.sort((a,b)=> a.id - b.id))
         let changed = loaded !== this.#lastLoaded
         this.#lastLoaded = loaded
+
+        // Voor wie elk item op het bord komt (plan stap 4.3). Na de vergelijking hierboven: de doelen
+        // bevatten hele groepen en afdelingen uit de momentopname, die horen niet in die tekst. Een
+        // nieuwe momentopname tekent de view sowieso opnieuw (ChangesUiManager.refreshTable).
+        modified_appointments.forEach(appointment => {
+            appointment.targets = appointmentTargets(appointment, this.connector)
+        })
         this.#appointments = modified_objects_object
-        //TODO: remove this
-        globalThis.ad = this.#appointments
         return changed
     }
 

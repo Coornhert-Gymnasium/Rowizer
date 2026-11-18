@@ -41,13 +41,15 @@ export function inWindow(window, now) {
  * @param input.now
  * @param input.isReady zijn er basisgegevens? Zonder weten we nog niet of er een dagrooster is
  * @param input.lessons aantal lesuren vandaag
+ * @param input.holiday naam van de vakantie vandaag, of null
  * @return {boolean} true = niet verversen
  */
-export function isResting({window, now, isReady, lessons}) {
+export function isResting({window, now, isReady, lessons, holiday = null}) {
     if (!window || !isReady) {
         return false
     }
-    return !lessons || !inWindow(window, now)
+    // in een vakantie staat er vaak gewoon een dagrooster, maar er zijn geen lessen
+    return !lessons || !!holiday || !inWindow(window, now)
 }
 
 /** "06:30" */

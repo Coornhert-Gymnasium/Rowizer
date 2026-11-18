@@ -42,7 +42,7 @@ test("429 volgt Retry-After, anders 60 seconden", async () => {
     assert.ok(without.clock.sleeps.includes(60000))
 })
 
-test("tussen twee verzoeken minstens 250 ms", async () => {
+test("tussen twee verzoeken minstens de ingestelde tussenruimte", async () => {
     let {session, fetch, clock} = setup([ok])
     let times = []
     let original = fetch
@@ -50,11 +50,11 @@ test("tussen twee verzoeken minstens 250 ms", async () => {
     times.push(clock.now())
     await session.request("b")
     times.push(clock.now())
-    assert.ok(times[1] - times[0] >= 250)
+    assert.ok(times[1] - times[0] >= session.budget.limits.spacing)
     assert.equal(original.calls.length, 2)
 })
 
-test("nooit meer dan 2 verzoeken tegelijk", async () => {
+test("nooit meer verzoeken tegelijk dan ingesteld", async () => {
     let active = 0, maxActive = 0
     let fetch = async () => {
         active++
@@ -67,16 +67,17 @@ test("nooit meer dan 2 verzoeken tegelijk", async () => {
     let clock = virtualClock()
     let session = new Session("demo", "token", {fetch, now: clock.now, sleep: clock.sleep, store: memoryStore()})
     await Promise.all(Array.from({length: 8}, (_, i) => session.request("x" + i)))
-    assert.equal(maxActive, 2)
+    assert.equal(maxActive, session.budget.limits.concurrent)
 })
 
-test("budget: het 101e verzoek in een uitbarsting wacht niet eindeloos maar faalt als 'rate'", async () => {
+test("budget: het verzoek boven het budget in een uitbarsting wacht niet eindeloos maar faalt als 'rate'", async () => {
     let {session, fetch} = setup([ok])
-    for (let i = 0; i < 100; i++) {
+    let max = session.budget.limits.windowMax
+    for (let i = 0; i < max; i++) {
         await session.request("x")
     }
     await assert.rejects(session.request("x"), e => e.kind === "rate" && e.local === true)
-    assert.equal(fetch.calls.length, 100)
+    assert.equal(fetch.calls.length, max)
     assert.equal(session.budget.hits, 1)
     // het eigen budget is geen storing van Zermelo
     assert.equal(session.health.state, "ok")
@@ -84,23 +85,25 @@ test("budget: het 101e verzoek in een uitbarsting wacht niet eindeloos maar faal
 
 test("budget: met ruimte binnen 2 minuten wacht het verzoek en gaat het door", async () => {
     let {session, fetch, clock} = setup([ok])
-    for (let i = 0; i < 100; i++) {
+    let max = session.budget.limits.windowMax
+    for (let i = 0; i < max; i++) {
         await session.request("x")
     }
     clock.advance(9*MINUTE)
     await session.request("x")
-    assert.equal(fetch.calls.length, 101)
-    assert.ok(session.budget.lastWindow <= 100)
+    assert.equal(fetch.calls.length, max + 1)
+    assert.ok(session.budget.lastWindow <= max)
 })
 
 test("budget overleeft een paginaherlading", async () => {
     let store = memoryStore()
     let first = setup([ok], {store})
-    for (let i = 0; i < 100; i++) {
+    let max = first.session.budget.limits.windowMax
+    for (let i = 0; i < max; i++) {
         await first.session.request("x")
     }
     let second = new Session("demo", "token", {fetch: first.fetch, now: first.clock.now, sleep: first.clock.sleep, store})
-    assert.equal(second.budget.lastWindow, 100)
+    assert.equal(second.budget.lastWindow, max)
     await assert.rejects(second.request("x"), e => e.kind === "rate")
 })
 

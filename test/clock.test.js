@@ -68,3 +68,16 @@ test("today() gebruikt de gecorrigeerde tijd", () => {
     assert.equal(today().toDateString(), tomorrow.toDateString())
     setClockOffset(0)
 })
+
+test("tijdzone: Amsterdam of een zone met dezelfde tijd is goed, andere niet", async () => {
+    let {timeZoneNote} = await import("../js/clockCheck.js")
+    let summer = Date.UTC(2026, 6, 1, 10)
+    let winter = Date.UTC(2026, 0, 15, 10)
+    assert.equal(timeZoneNote("Europe/Amsterdam", summer, "Europe/Amsterdam"), null)
+    assert.equal(timeZoneNote("Europe/Amsterdam", summer, "Europe/Brussels"), null)
+    assert.equal(timeZoneNote("Europe/Amsterdam", winter, "UTC"), "tijdzone UTC")
+    assert.equal(timeZoneNote("Europe/Amsterdam", summer, "Europe/London"), "tijdzone Europe/London")
+    assert.equal(timeZoneNote("Europe/Amsterdam", summer, null), "tijdzone onbekend")
+    // de tests draaien zelf in Europe/Amsterdam (helpers/tz.js)
+    assert.equal(timeZoneNote(), null)
+})
