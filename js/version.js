@@ -1,2 +1,2 @@
 // Wordt overschreven door scripts/stamp-version.sh met de git commit hash.
-export const VERSION = "7d73d03";
+export const VERSION = "09a0de8";
