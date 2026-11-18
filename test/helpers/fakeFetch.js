@@ -3,7 +3,7 @@
 
 export function zermeloResponse(status, data = [], extra = {}) {
     let body = {response: {status, message: status === 200 ? "" : "melding " + status, details: "", eventId: 123,
-        startRow: 0, endRow: data.length, totalRows: data.length, data, ...extra}}
+        startRow: 0, endRow: data?.length ?? 0, totalRows: data?.length ?? 0, data, ...extra}}
     return new Response(JSON.stringify(body), {
         status: status === 200 ? 200 : status,
         headers: {"content-type": "application/json", ...(extra.headers || {})},

@@ -81,7 +81,18 @@ class Session{
                 retryAfter: retryAfter > 0 ? retryAfter : undefined,
             })
         }
-        return data.response.data
+
+        // Een afgekapt of verkeerd gevormd antwoord mag nooit als 'geen wijzigingen' gelden.
+        let rows = data.response.data
+        if(!Array.isArray(rows)){
+            throw new ZermeloNetworkError(endpoint + ": response without data", {kind: "data", endpoint})
+        }
+        let total = data.response.totalRows
+        if(typeof total === "number" && total > rows.length){
+            throw new ZermeloNetworkError(endpoint + ": incomplete response, " + rows.length + " of " + total + " rows",
+                {kind: "data", endpoint})
+        }
+        return rows
     }
 }
 export default Session;
