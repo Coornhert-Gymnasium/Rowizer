@@ -17,7 +17,7 @@ import {readSettings, rememberToken, urlWithoutToken} from "./settings.js";
 import {missingSettings, showSetupScreen} from "./setupScreen.js";
 import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
-import {measureClockOffset, clockNote} from "./clockCheck.js";
+import {measureClockOffset, clockNote, timeZoneNote} from "./clockCheck.js";
 import diagnostics from "./diagnostics.js";
 import {parseWindow, isResting} from "./activeWindow.js";
 import {fetchVersion, shouldReload, triedStore} from "./versionCheck.js";
@@ -62,6 +62,13 @@ if(missing.length){
     window.rowizerHeartbeat = Date.now()
     setInterval(() => { window.rowizerHeartbeat = Date.now() }, 60*1000)
     await new Promise(() => {})
+}
+
+// Tijdzone van dit scherm (plan stap R.6): alleen melden, rechtsonder en in de diagnose.
+let time_zone_note = timeZoneNote()
+if(time_zone_note){
+    console.warn("This screen is not on Europe/Amsterdam time (" + time_zone_note + "): today and the current period may be wrong")
+    diagnostics.timeZone = time_zone_note
 }
 
 // Klok controleren voordat we bepalen welke dag het is (plan stap R.6). Hoogstens 5 seconden:
@@ -209,7 +216,7 @@ let updateStatus = function(){
         changesUiManager.showMessage(status.boardMessage)
     }
 
-    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), clockNote(clockOffset()), status.updated, VERSION].filter(Boolean).join(" · ")
+    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), clockNote(clockOffset()), time_zone_note, status.updated, VERSION].filter(Boolean).join(" · ")
 
     let absences_container = document.querySelector("#absences-container")
     absences_container.classList.toggle("stale", status.absences === "stale")

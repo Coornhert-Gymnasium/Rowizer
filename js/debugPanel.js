@@ -60,6 +60,9 @@ export function debugText({scheduler, session, connector, version}) {
     if (diagnostics.token) {
         lines.push("Token: " + diagnostics.token.user + ", verloopt " + (diagnostics.token.expires ? new Date(diagnostics.token.expires).toLocaleDateString("nl-NL") : "nooit"))
     }
+    if (diagnostics.timeZone) {
+        lines.push("Let op: " + diagnostics.timeZone + " (verwacht Europe/Amsterdam)")
+    }
     if (diagnostics.clockOffset !== undefined) {
         lines.push("Klokafwijking: " + Math.round(diagnostics.clockOffset/1000) + " s")
     }

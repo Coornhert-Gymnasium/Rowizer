@@ -20,6 +20,41 @@ export async function measureClockOffset(options = {}) {
     return server + 500 - (before + after) / 2
 }
 
+export const SCHOOL_TIME_ZONE = "Europe/Amsterdam"
+
+/**
+ * Tijdzone van dit scherm (plan stap R.6, besluit 7). Rowizer rekent met de tijd van het scherm;
+ * staat dat op een andere tijdzone dan de school, dan kloppen de dag en het lopende lesuur niet.
+ * Dat lossen we niet op in de code (de Pi staat op Amsterdam), maar het moet wel opvallen.
+ * @return {string|null} korte code voor rechtsonder, bv. "tijdzone UTC", of null als het klopt
+ */
+export function timeZoneNote(expected = SCHOOL_TIME_ZONE, now = Date.now(), resolved = currentTimeZone()) {
+    if (resolved === expected) {
+        return null
+    }
+    // een andere naam met dezelfde tijd (bv. Europe/Brussels) is geen probleem
+    let format = zone => {
+        try {
+            return new Intl.DateTimeFormat("en-GB", {timeZone: zone, dateStyle: "short", timeStyle: "short"}).format(now)
+        } catch (e) {
+            return null
+        }
+    }
+    let ours = format(resolved), school = format(expected)
+    if (ours && school && ours === school) {
+        return null
+    }
+    return "tijdzone " + (resolved || "onbekend")
+}
+
+function currentTimeZone() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone
+    } catch (e) {
+        return null
+    }
+}
+
 /** Korte code voor rechtsonder, bv. "klok +12 min", of null als de klok goed staat. */
 export function clockNote(offset) {
     if (!offset) {
