@@ -6,10 +6,11 @@ information on screens.
 
 Rowizer: 
 - Determines the actual impact the changes have on the schedule: only relevant information[^1] is shown - no endless lists of changes. 
-- Highlights new changes (made after 8AM)
-- Always shows activities in green 
-- Automatically fetches new changes from Zermelo
-- Shows absent teachers 
+- Highlights new changes (made today, after 01:00)
+- Always shows activities in green, exams in blue; cancelled items get a red stripe, moved lessons an orange one on their old period
+- Automatically fetches new changes from Zermelo, and keeps working through network and Zermelo outages
+- Shows absent teachers, with the periods they are absent: `krh (1-3)`
+- Highlights the current period and dims what is over
 - Scroll if there are too many changes
 
 
@@ -69,3 +70,13 @@ You are very welcome to use Rowizer using our Github-pages. Bear in mind that th
 |active| 07:00-17:00                        | | Time window in which the board refreshes; default 06:30-18:00. Outside it, and on days without lessons, the board keeps showing the last state and sends no requests to Zermelo. The first refresh happens right when the window starts. `off` refreshes around the clock. |
 |rememberToken| 1                        | | Stores the token in the browser (localStorage) and removes it from the address bar; afterwards the address without `token` is enough. A new token in the address replaces the stored one. Off by default: if the player does not keep storage, the setup screen appears. |
 |scale| 1.2                        | | Makes everything on the screen larger or smaller (0.5 to 3) without browser zoom. Text already scales with the screen width; at 1 a busy day fits a 1920x1080 or 3840x2160 screen without scrolling. |
+|debug| 1                        | | Shows a diagnostics panel (requests, request budget, tasks, errors) and exposes `cm`, `zc`, `ad()` and `dc(date)` in the console. Never shows the token. |
+
+## Development
+There is no build step: the page loads the ES modules in `js/` directly.
+
+- Run locally: `python scripts/dev-server.py 8766` and open `http://localhost:8766/#token=...&portal=...`. This server sends `Cache-Control: no-store`, so the browser always loads the current modules.
+- Tests: `npm test` (Node 22, no dependencies). The tests run in time zone Europe/Amsterdam and use recorded Zermelo data from `test/fixtures/`; record a new day with `scripts/record-fixtures.mjs`. The board for the demo day is compared line by line with `test/snapshots/board-2026-09-23.txt`.
+- Failure scenarios and how they were tested: [docs/STORINGSTEST.md](docs/STORINGSTEST.md).
+- Background and the plan behind recent changes: [docs/VERBETERPLAN.md](docs/VERBETERPLAN.md).
+- After a push to `master`, a GitHub Action stamps `js/version.js`; screens notice the new version within 15 minutes and reload. In other copies run `scripts/stamp-version.sh` by hand.

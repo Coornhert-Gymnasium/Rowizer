@@ -1,21 +1,11 @@
-import ChangedRecordHolder from "./lib/changedRecordHolder.js";
-import {mergeSubsequentAppointments, arraysEqual} from "../../zermelo/utils/mergeAppointments.js";
+import {mergeSubsequentAppointments} from "../../zermelo/utils/mergeAppointments.js";
 import {countOutOfGrid, countUnknownReference} from "../../diagnostics.js";
 import {linkMovedLessons} from "./movedLessons.js";
+import {appointmentTargets} from "./targets.js";
 
 class Changes {
-    #date;
     #appointments;
     #lastLoaded;
-
-
-    #schoolInYear
-
-    //afdeling-jaarlaag (dus A3 is 1 department)
-
-
-    //klassen en clusters
-
     #appointmentCategories;
     #mergeMultipleHourSpan;
 
@@ -59,9 +49,6 @@ class Changes {
             }
 
         }
-
-        //TODO: remove this
-        globalThis.ad = this.#appointments
     }
 
 
@@ -107,7 +94,8 @@ class Changes {
 
         categories_names.forEach(category=>{
             category_results[category].forEach(appointment => {
-                if(appointment.lastModified > globalThis.pretendLikeIts){
+                // alleen met debug=1: doen alsof het eerder is (zie script.js)
+                if(globalThis.pretendLikeIts && appointment.lastModified > globalThis.pretendLikeIts){
                     return;
                 }
                 modified_appointments[appointment.id] = appointment
@@ -250,6 +238,11 @@ class Changes {
 
         })
 
+        // voor wie elk item op het bord komt (plan stap 4.3)
+        modified_appointments.forEach(appointment => {
+            appointment.targets = appointmentTargets(appointment, this.connector)
+        })
+
         // Een groep die vandaag is aangemaakt kent de momentopname nog niet: basisgegevens verversen.
         if(unknown_reference && this.connector.requestRefresh){
             this.connector.requestRefresh()
@@ -262,8 +255,6 @@ class Changes {
         let changed = loaded !== this.#lastLoaded
         this.#lastLoaded = loaded
         this.#appointments = modified_objects_object
-        //TODO: remove this
-        globalThis.ad = this.#appointments
         return changed
     }
 

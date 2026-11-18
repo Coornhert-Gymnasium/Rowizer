@@ -29,8 +29,6 @@ const MAINTENANCE_HOUR = 3
 
 installErrorHandlers()
 console.log("Rowizer loaded, version " + VERSION)
-//TODO: remove this
-//window.pretendLikeIts = 1717452000000/1000;
 
 // Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
 let params = readSettings(window.location)
@@ -41,6 +39,10 @@ if(local_storage && rememberToken(params, local_storage)){
     history.replaceState(null, "", urlWithoutToken(window.location.href))
 }
 let param_debug = params.get("debug") === "1"
+// Met debug=1 en pretend=<epoch in seconden> negeert het bord wijzigingen van na dat moment.
+if(param_debug && Number(params.get("pretend"))){
+    window.pretendLikeIts = Number(params.get("pretend"))
+}
 
 // Grootte van alles op het scherm bijstellen zonder browserzoom (plan stap 2.1), bv. scale=1.2.
 let param_scale = parseFloat(params.get("scale"))
@@ -113,8 +115,12 @@ var absencesUiManager = new AbsencesUiManager(document.querySelector("#absences-
 var outofoffice = new OutOfOffice(connector)
 var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#outofoffice-inner-container"),connector,outofoffice)
 
-window.cm = changesUiManager
-window.zc = connector
+// Hulpmiddelen in de console, alleen met debug=1 (plan stap 4.2)
+if(param_debug){
+    window.cm = changesUiManager
+    window.zc = connector
+    window.ad = () => changesManager.appointments
+}
 
 // Rusttijd (plan stap 3.2): buiten het venster of op een dag zonder lessen niet verversen.
 let resting = () => isResting({
@@ -209,7 +215,9 @@ let switchDay = async function(date){
     }
     scheduler.runNow()
 }
-window.dc = switchDay
+if(param_debug){
+    window.dc = switchDay
+}
 
 let rollover = new DayRollover({
     currentDate: () => connector.date,

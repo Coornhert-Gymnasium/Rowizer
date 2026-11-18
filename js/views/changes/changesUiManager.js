@@ -191,105 +191,52 @@ export class ChangesUiManager {
         // laat nu alles zien: exams en keuzelessen hebben geen afspraak
         let app_filtered = Object.values(this.changesManager.appointments)
 
-        let do_app = function (apps, cm) {
+        let do_app = function (apps) {
             apps.forEach(appointment => {
                 try {
-                                    if(appointment.groupsInDepartments.length != 0){
-                        appointment.groupsInDepartments.forEach(group_id => {
-
-                            let group = cm.connector.getGroupInDepartment(group_id)
-                            let branch = group && cm.connector.getDepartmentOfBranch(group.departmentOfBranch)
-                            if (!branch) {
-                                console.warn("Appointment " + appointment.id + ": unknown group or department for group " + group_id)
-                                return;
-                            }
-                            let i = appointment.startTimeSlot
-
-
-                            if(appointment.type === "activity" || appointment.type === "exam") {
-                                if (appointment.cancelled && changes.find(c => c.entity.id === group.id && c.period_start <= appointment.startTimeSlot && c.period_end >= appointment.endTimeSlot)){
-                                    return;
-                                }
-                                changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment))
-                            } else {
-                                while (i <= appointment.endTimeSlot) {
-                                    //filteren van dingen die tegelijk met activiteiten uitvallen
-                                    if (changes.find(c => c.entity.id === group.id && c.period_start <= i && c.period_end >= i)) {
-                                        return;
-                                    }
-
-                                    i++;
-                                }
-                                changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
-                            }
-                        })
-                    } else if (appointment.students.length != 0 ) {
-                        //
-                        // HELP DIT IS EEN STOMME HACK
-                        // DIT MOET NIET HIER
-                        //
-                        // Model-view-controller... -> dit moet in de connector::changes. 
-                        //
-                        //console.log("appointment with students but no group in department: " + appointment.type);
-                        //console.log(appointment)
-                        // loop alle studenten langs, en haal hun afdeling (klas) op.
-                        let depts = new Set()
-                        let unknown_students = 0
-                        appointment.students.forEach(student => {
-                            let student_in_department = cm.connector.getStudentInDepartment(student)
-                            if (student_in_department) {
-                                depts.add(student_in_department.departmentOfBranch);
-                            } else {
-                                unknown_students++
-                            }
-                        })
-                        if (unknown_students) {
-                            console.warn("Appointment " + appointment.id + ": " + unknown_students + " unknown student(s)")
-                        }
-                        // maak voor alle afdelingen een fake groep aan, en voeg die toe aan de changes.
-                        //  De naam van de groep is de opmerking van de roostermaker "remark / schedulerremake" in zermelo
-                        depts.forEach(dept => {
-                            let branch = cm.connector.getDepartmentOfBranch(dept)
-                            if (!branch) {
-                                console.warn("Appointment " + appointment.id + ": unknown department " + dept)
-                                return;
-                            }
-                            // Maak een fake group, met naam uit "subject" van de afspraak, en extended name uit "remark" van de afspraak. 
-                            // Niet elke afspraak heeft een vak: gebruik dan alleen de opmerking als naam.
-                            // alfabetisch eerste vak, zoals het bord altijd toonde (zie appointmentText.js)
-                            let subject = [...appointment.subjects].sort()[0]
-                            let remark = subject ? subject.substring(0, 6) : ""
-                            if (appointment.type === "exam" || !subject) {
-                                // toetsen krijgen uitgebreide beschrijving:
-                                remark = (remark + " " + (appointment.remark || "")).trim();
-                            }
-                            let group = {'id': appointment.id, 'departmentOfBranch': dept, 'name': remark, 'extendedName': remark, "isMainGroup": false, "isMentorGroup": false}
-                            changes.push(new ChangesUIRecordClass(group, branch, appointment.startTimeSlot, appointment.endTimeSlot, appointment));
-                        })
-                    } else {
-                        console.log("Skipping: " + appointment.type + " " + appointment.subjects);
-                        console.log(appointment)
+                    // voor wie dit item is, bepaalt de controller (plan stap 4.3)
+                    let targets = appointment.targets || []
+                    if (!targets.length) {
+                        console.debug("Skipping appointment " + appointment.id + " (" + appointment.type + "): no groups or students")
                     }
+                    targets.forEach(({group, department, fake}) => {
+                        let overlaps = (from, to) => changes.find(c => c.entity.id === group.id && c.period_start <= from && c.period_end >= to)
+                        if (!fake) {
+                            if (appointment.type === "activity" || appointment.type === "exam") {
+                                // vervallen activiteit of toets weglaten als er voor die groep al iets op dat uur staat
+                                if (appointment.cancelled && overlaps(appointment.startTimeSlot, appointment.endTimeSlot)) {
+                                    return
+                                }
+                            } else {
+                                // filteren van dingen die tegelijk met activiteiten uitvallen
+                                for (let i = appointment.startTimeSlot; i <= appointment.endTimeSlot; i++) {
+                                    if (overlaps(i, i)) {
+                                        return
+                                    }
+                                }
+                            }
+                        }
+                        changes.push(new ChangesUIRecordClass(group, department, appointment.startTimeSlot, appointment.endTimeSlot, appointment))
+                    })
                 } catch (e) {
                     // Eén afspraak met onverwachte gegevens mag nooit het hele bord leeg laten.
                     console.warn("Skipping appointment " + appointment.id, e, appointment)
                 }
             })
-
         }
 
-        do_app(app_filtered.filter(app => app.type === 'activity' && app.valid && !app.cancelled), this)
-        do_app(app_filtered.filter(app => app.type === 'activity' && app.valid && app.cancelled), this)
-        do_app(app_filtered.filter(app => app.type === 'exam' && app.valid && !app.cancelled), this)
-        do_app(app_filtered.filter(app => app.type === 'exam' && app.valid && app.cancelled), this)
+        do_app(app_filtered.filter(app => app.type === 'activity' && app.valid && !app.cancelled))
+        do_app(app_filtered.filter(app => app.type === 'activity' && app.valid && app.cancelled))
+        do_app(app_filtered.filter(app => app.type === 'exam' && app.valid && !app.cancelled))
+        do_app(app_filtered.filter(app => app.type === 'exam' && app.valid && app.cancelled))
 
-        do_app(app_filtered.filter(app => app.type === 'lesson' && app.valid && !app.cancelled), this)
-        do_app(app_filtered.filter(app => app.type === 'lesson' && app.valid && app.cancelled), this)
+        do_app(app_filtered.filter(app => app.type === 'lesson' && app.valid && !app.cancelled))
+        do_app(app_filtered.filter(app => app.type === 'lesson' && app.valid && app.cancelled))
 
         // Oude versies (!valid) alleen als de les naar een ander uur verplaatst is (plan stap 3.3); als
         // laatste, zodat ze wegvallen als de groep op dat uur al iets anders op het bord heeft. Andere
         // oude versies (alleen een ander lokaal of een andere docent) zouden er als "vervalt" bij komen.
-        do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid && app.movedTo), this)
+        do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid && app.movedTo))
 
         return changes.sort(compareChanges)
     }

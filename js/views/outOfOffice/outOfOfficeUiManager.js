@@ -24,11 +24,6 @@ export class OutOfOfficeUiManager {
         this.element.replaceChildren(...elements)
     }
 
-    merge(){
-
-    }
-
-
     async refresh() {
         //TODO: this is quick n dirty way to show the new changes
         let changes = await this.outOfOfficeManager.loadAll()

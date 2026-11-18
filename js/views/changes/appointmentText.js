@@ -31,8 +31,7 @@ export function appointmentText(entity, appointment) {
             if (firstSubject) {
                 str += firstSubject.substring(0, 6)
             } else {
-                console.log("appointment with no subjects: " + appointment.type);
-                console.log(appointment);
+                console.debug("Appointment " + appointment.id + " (" + appointment.type + ") has no subjects")
                 str += appointment.remark || ""
             }
             if (subjects.length > 1) {
