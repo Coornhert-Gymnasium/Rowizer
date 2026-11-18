@@ -183,7 +183,8 @@ class Changes {
                 department_id = Number(department_id)
                 let appointment_groups = departments[department_id].sort()
                 let department = this.connector.departments[department_id];
-                let department_groups = department.mainGroupsInDepartment.sort()
+                // kopie sorteren: de basisgegevens horen ongewijzigd te blijven
+                let department_groups = [...department.mainGroupsInDepartment].sort()
                 if(appointment_groups.length === department_groups.length && JSON.stringify(appointment_groups) === JSON.stringify(department_groups)){
                     //console.log("whole department is added to this appointment")
                     appointment.departmentComplete.push(department_id)
@@ -204,7 +205,7 @@ class Changes {
             Object.keys(years).forEach(year=>{
 
                 // een jaarlaag kan ontbreken, bv. als al haar afdelingen genegeerd worden
-                let departments_in_year = (this.connector.yearsOfEducation[year] || []).sort()
+                let departments_in_year = [...(this.connector.yearsOfEducation[year] || [])].sort()
                 let departments_in_appointment = years[year].sort()
                 //if(departments_in_appointment.length > 1){debugger;}
                 if(departments_in_year.length === departments_in_appointment.length && JSON.stringify(departments_in_year) === JSON.stringify(departments_in_appointment)){

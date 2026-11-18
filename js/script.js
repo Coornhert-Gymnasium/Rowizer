@@ -99,10 +99,15 @@ setInterval(()=> {
     if(last_checked_date.toDateString() !== new Date().toDateString()){
         window.rowizerReload()
     }
-    // Zonder basisgegevens (bv. door een netwerkfout bij het opstarten) kan niets laden: probeer het opnieuw.
-    else if(!connector.isReady && (connector.loadError || Date.now() - started_at > STARTUP_TIMEOUT)){
-        showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
-        window.rowizerReload()
+    // Zonder basisgegevens kan niets laden. De connector probeert het zelf opnieuw; alleen als
+    // dat na STARTUP_TIMEOUT nog niet gelukt is, herladen we de pagina.
+    else if(!connector.isReady){
+        if(connector.loadError){
+            showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
+        }
+        if(Date.now() - started_at > STARTUP_TIMEOUT){
+            window.rowizerReload()
+        }
     }
 }, RETRY_INTERVAL)
 

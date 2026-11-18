@@ -7,6 +7,8 @@
  *  permission 403, token mist een recht, of een veld/filter bestaat niet (meer)
  *  request    overige 4xx
  *  data       het antwoord klopt niet (onvolledig, verkeerde vorm)
+ *  config     de instellingen passen niet bij de portal (onbekende vestiging, schooljaar
+ *             nog niet ingericht); `reason` zegt wat er mis is
  */
 export const RETRYABLE_KINDS = ["network", "server", "rate", "data"]
 
@@ -20,6 +22,7 @@ export class ZermeloError extends Error {
         this.zermeloMessage = details.zermeloMessage
         this.eventId = details.eventId
         this.retryAfter = details.retryAfter
+        this.reason = details.reason
     }
 
     get retryable() {
