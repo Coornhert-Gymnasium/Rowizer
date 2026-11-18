@@ -2,25 +2,85 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <!-- het token staat in de URL: nooit als referrer meesturen -->
+    <meta name="referrer" content="no-referrer">
     <base target="_top">
     <link rel="icon" href="data:,">
-    <script>
-        // Herlaad alleen als de site bereikbaar is: zonder netwerk zou het scherm blijven hangen op de foutpagina van de browser.
-        window.rowizerReload = function () {
-            fetch(location.href, {method: "HEAD", cache: "no-store"}).then(function (response) {
-                if (response.status < 500) {
-                    location.reload()
+    <script id="watchdog">
+        // Waakhond (plan stap R.11). Staat bewust inline: hij moet ook werken als de modules niet laden.
+        (function () {
+            var MINUTE = 60 * 1000
+            // Rem: na elke herlading langer wachten voor de volgende (1, 2, 5, 15, daarna 30 minuten).
+            var BRAKE = [1, 2, 5, 15, 30].map(function (m) { return m * MINUTE })
+            var HEARTBEAT_TIMEOUT = 15 * MINUTE
+            var NOT_STARTED_TIMEOUT = MINUTE
+            var bootedAt = Date.now()
+
+            // De teller staat in window.name: die blijft bij herladen bestaan, ook zonder localStorage.
+            function load() {
+                try {
+                    return JSON.parse(window.name || "{}") || {}
+                } catch (e) {
+                    return {}
                 }
-            }).catch(function (e) {
-                console.warn("Site not reachable, not reloading", e)
-            })
-        }
-        // Als de scripts niet geladen konden worden start de app nooit: probeer het dan opnieuw.
-        setInterval(function () {
-            if (!window.rowizerStarted) {
-                window.rowizerReload()
             }
-        }, 60 * 1000)
+            function reloads() {
+                return load().rowizerReloads || {count: 0, last: 0}
+            }
+            function saveReloads(value) {
+                var all = load()
+                all.rowizerReloads = value
+                try {
+                    window.name = JSON.stringify(all)
+                } catch (e) {
+                }
+            }
+
+            // Herlaad alleen als de site bereikbaar is: zonder netwerk zou het scherm blijven hangen op
+            // de foutpagina van de browser. Zonder query: het token hoort niet naar de webserver.
+            window.rowizerReload = function (reason) {
+                var state = reloads()
+                var wait = state.count === 0 ? 0 : BRAKE[Math.min(state.count - 1, BRAKE.length - 1)]
+                if (Date.now() - state.last < wait) {
+                    console.warn("Not reloading yet (" + reason + "), " + state.count + " reload(s) in a row")
+                    return false
+                }
+                fetch(location.pathname, {method: "HEAD", cache: "no-store"}).then(function (response) {
+                    if (response.status < 500) {
+                        console.warn("Reloading: " + reason)
+                        saveReloads({count: state.count + 1, last: Date.now()})
+                        location.reload()
+                    }
+                }).catch(function (e) {
+                    console.warn("Site not reachable, not reloading", e)
+                })
+                return true
+            }
+
+            // Een geslaagde verversronde: de rem gaat eraf.
+            window.rowizerReloadOk = function () {
+                var state = reloads()
+                if (state.count) {
+                    saveReloads({count: 0, last: state.last})
+                }
+            }
+
+            window.rowizerWatchdogCheck = function () {
+                if (!window.rowizerStarted) {
+                    // de modules zijn niet geladen of gecrasht
+                    if (Date.now() - bootedAt > NOT_STARTED_TIMEOUT) {
+                        window.rowizerReload("not started")
+                    }
+                    return
+                }
+                // De planner zet na elke afgeronde ronde een hartslag. Staat die stil, dan hangt er iets.
+                var beat = window.rowizerHeartbeat || bootedAt
+                if (Date.now() - beat > HEARTBEAT_TIMEOUT) {
+                    window.rowizerReload("no heartbeat")
+                }
+            }
+            setInterval(window.rowizerWatchdogCheck, MINUTE)
+        })()
     </script>
     <script src="js/script.js" type="module"></script>
     <script src="js/clock.js" type="module"></script>
@@ -41,7 +101,7 @@
         <div class="flex" id="clock">0:00:00</div>
     </div>
     <div style="display:none;" class="flex padding-standard content-background"  id="absences-container">
-        Afwezig:<div class="flex"></div>
+        Afwezig:<div class="flex"></div><span id="absences-note"></span>
 
     </div>
     <div style="display:none;" class="flex padding-standard content-background"  id="outofoffice-container">
@@ -51,6 +111,7 @@
     <div class="flex flex-fill" id="content-container">
     </div>
 </div>
+<div id="footer"></div>
 </body>
 
 

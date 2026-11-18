@@ -1,0 +1,12 @@
+[
+{"id":30000,"code":"u04","rank":4,"schoolInSchoolYear":1001702,"timeSlots":[20001,20000,20002],"name":"u04"},
+{"id":30001,"code":"u05","rank":5,"schoolInSchoolYear":1001702,"timeSlots":[20003,20004,20005],"name":"u05"},
+{"id":30002,"code":"u03","rank":3,"schoolInSchoolYear":1001702,"timeSlots":[20008,20006,20007],"name":"u03"},
+{"id":30003,"code":"u02","rank":2,"schoolInSchoolYear":1001702,"timeSlots":[20011,20010,20009],"name":"u02"},
+{"id":30004,"code":"u01","rank":1,"schoolInSchoolYear":1001702,"timeSlots":[20013,20014,20012],"name":"u01"},
+{"id":30005,"code":"u06","rank":6,"schoolInSchoolYear":1001702,"timeSlots":[20015,20016,20017],"name":"u06"},
+{"id":30006,"code":"u10","rank":10,"schoolInSchoolYear":1001702,"timeSlots":[20019,20020,20018],"name":"u10"},
+{"id":30007,"code":"u07","rank":7,"schoolInSchoolYear":1001702,"timeSlots":[20022,20021,20023],"name":"u07"},
+{"id":30008,"code":"u08","rank":8,"schoolInSchoolYear":1001702,"timeSlots":[20024,20026,20025],"name":"u08"},
+{"id":30009,"code":"u09","rank":9,"schoolInSchoolYear":1001702,"timeSlots":[20029,20027,20028],"name":"u09"}
+]

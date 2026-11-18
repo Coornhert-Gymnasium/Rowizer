@@ -1,5 +1,6 @@
 import ChangedRecordHolder from "./lib/changedRecordHolder.js";
 import {mergeSubsequentAppointments, arraysEqual} from "../../zermelo/utils/mergeAppointments.js";
+import {countOutOfGrid, countUnknownReference} from "../../diagnostics.js";
 
 class Changes {
     #date;
@@ -59,7 +60,7 @@ class Changes {
         }
 
         //TODO: remove this
-        window.ad = this.#appointments
+        globalThis.ad = this.#appointments
     }
 
 
@@ -105,7 +106,7 @@ class Changes {
 
         categories_names.forEach(category=>{
             category_results[category].forEach(appointment => {
-                if(appointment.lastModified > window.pretendLikeIts){
+                if(appointment.lastModified > globalThis.pretendLikeIts){
                     return;
                 }
                 modified_appointments[appointment.id] = appointment
@@ -137,6 +138,26 @@ class Changes {
             }
         })
 
+        // Geen afspraak mag buiten het raster vallen: één verkeerd lesuur zou de kolommen van de
+        // hele jaarlaag verschuiven (plan stap R.8).
+        let ranks = Object.values(this.connector.timeslots || {}).map(t => t.rank).filter(Number.isFinite)
+        let lastSlot = ranks.length ? Math.max(...ranks) : 1
+        Object.values(modified_appointments).forEach(appointment => {
+            let start = Number.isFinite(appointment.startTimeSlot) ? appointment.startTimeSlot : 1
+            let end = Number.isFinite(appointment.endTimeSlot) ? appointment.endTimeSlot : start
+            if(end < start){
+                [start, end] = [end, start]
+            }
+            start = Math.min(Math.max(start, 1), lastSlot)
+            end = Math.min(Math.max(end, start), lastSlot)
+            if(start !== appointment.startTimeSlot || end !== appointment.endTimeSlot){
+                console.warn("Appointment " + appointment.id + ": timeslots " + appointment.startTimeSlot + "-" + appointment.endTimeSlot + " outside the grid, showing " + start + "-" + end)
+                countOutOfGrid()
+                appointment.startTimeSlot = start
+                appointment.endTimeSlot = end
+            }
+        })
+
         // LET OP: mergeSubsequentAppointments returned een array (lijst),
         //  modified_appointments is hierboven een object (dictionary) met appointment.id als key en appointment als value
         modified_appointments = Object.values(modified_appointments)
@@ -145,6 +166,7 @@ class Changes {
             //this.#combineSpansMultipleHours(modified_appointments)
         }
 
+        let unknown_reference = false
         Object.values(modified_appointments).forEach(appointment=>{
             //bepalen of er hele afdelingen en/of jaarlagen in zitten
             //years heeft jaren als key en array met departments als value
@@ -163,6 +185,8 @@ class Changes {
                 let department = group && this.connector.departments[group.departmentOfBranch]
                 if(!department){
                     console.warn("Appointment " + appointment.id + ": unknown group or department for group " + group_id)
+                    countUnknownReference()
+                    unknown_reference = true
                     return
                 }
 
@@ -183,7 +207,8 @@ class Changes {
                 department_id = Number(department_id)
                 let appointment_groups = departments[department_id].sort()
                 let department = this.connector.departments[department_id];
-                let department_groups = department.mainGroupsInDepartment.sort()
+                // kopie sorteren: de basisgegevens horen ongewijzigd te blijven
+                let department_groups = [...department.mainGroupsInDepartment].sort()
                 if(appointment_groups.length === department_groups.length && JSON.stringify(appointment_groups) === JSON.stringify(department_groups)){
                     //console.log("whole department is added to this appointment")
                     appointment.departmentComplete.push(department_id)
@@ -204,7 +229,7 @@ class Changes {
             Object.keys(years).forEach(year=>{
 
                 // een jaarlaag kan ontbreken, bv. als al haar afdelingen genegeerd worden
-                let departments_in_year = (this.connector.yearsOfEducation[year] || []).sort()
+                let departments_in_year = [...(this.connector.yearsOfEducation[year] || [])].sort()
                 let departments_in_appointment = years[year].sort()
                 //if(departments_in_appointment.length > 1){debugger;}
                 if(departments_in_year.length === departments_in_appointment.length && JSON.stringify(departments_in_year) === JSON.stringify(departments_in_appointment)){
@@ -221,6 +246,11 @@ class Changes {
 
         })
 
+        // Een groep die vandaag is aangemaakt kent de momentopname nog niet: basisgegevens verversen.
+        if(unknown_reference && this.connector.requestRefresh){
+            this.connector.requestRefresh()
+        }
+
         let modified_objects_object = {}
         modified_appointments.forEach(app => modified_objects_object[app.id] = app)
 
@@ -229,7 +259,7 @@ class Changes {
         this.#lastLoaded = loaded
         this.#appointments = modified_objects_object
         //TODO: remove this
-        window.ad = this.#appointments
+        globalThis.ad = this.#appointments
         return changed
     }
 

@@ -9,16 +9,49 @@ import {AbsencesUiManager} from "./views/absences/absencesUiManager.js";
 import OutOfOffice from "./controllers/outofoffice/outOfOffice.js";
 import {OutOfOfficeUiManager} from "./views/outOfOffice/outOfOfficeUiManager.js";
 import {VERSION} from "./version.js";
+import DayRollover from "./dayRollover.js";
+import Scheduler from "./scheduler.js";
+import {computeStatus} from "./status.js";
+import {checkToken, tokenNote} from "./tokenCheck.js";
+import {readSettings} from "./settings.js";
+import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
+import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
+import {measureClockOffset, clockNote} from "./clockCheck.js";
+import diagnostics from "./diagnostics.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
 const STARTUP_TIMEOUT = 5*60*1000
+const MAINTENANCE_HOUR = 3
 
+installErrorHandlers()
 console.log("Rowizer loaded, version " + VERSION)
 //TODO: remove this
 //window.pretendLikeIts = 1717452000000/1000;
 
-let params = new URLSearchParams(window.location.search)
+// Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
+let params = readSettings(window.location)
+let param_debug = params.get("debug") === "1"
+
+// Klok controleren voordat we bepalen welke dag het is (plan stap R.6). Hoogstens 5 seconden:
+// zonder antwoord gaan we uit van de eigen klok.
+let checkClock = async function(){
+    let offset = await Promise.race([
+        measureClockOffset({url: location.pathname}),
+        new Promise(resolve => setTimeout(() => resolve(null), 5000)),
+    ])
+    if(offset !== null){
+        diagnostics.clockOffset = offset
+        if(setClockOffset(offset)){
+            console.warn("Clock of this screen is off by " + Math.round(offset/1000) + " s, using the web server's time")
+        }
+    }
+}
+try {
+    await checkClock()
+} catch (e) {
+    console.warn("Could not check the clock", e)
+}
 
 //portal: naam vh portal, token: api-token, branch: branchcode (vestigingscode)
 
@@ -53,6 +86,58 @@ var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#out
 window.cm = changesUiManager
 window.zc = connector
 
+// Eén planner voor alle verversloops (plan stap R.10): elke 5 minuten, na een mislukte ronde
+// na een minuut, met een willekeurige start zodat schermen niet gelijk lopen.
+let scheduler = new Scheduler({onRound: task => {
+    // een geslaagde ronde haalt de rem van de waakhond (index.html)
+    if(task.failures === 0 && window.rowizerReloadOk){
+        window.rowizerReloadOk()
+    }
+    updateStatus()
+}})
+scheduler.listen()
+window.rowizerScheduler = scheduler
+
+let absences_allowed = true
+let token_info = null
+
+// Laat op het scherm zien hoe actueel de gegevens zijn (besluit 9: neutrale tekst, de oorzaak
+// als korte code rechtsonder).
+let updateStatus = function(){
+    let status = computeStatus({
+        now: Date.now(),
+        isReady: connector.isReady,
+        loadError: connector.loadError,
+        health: zapi.session.health,
+        changes: scheduler.task("changes"),
+        changesFailure: changesUiManager.lastFailure,
+        absences: absences_allowed ? scheduler.task("absences") : undefined,
+        clockOffset: clockOffset(),
+    })
+
+    let bar = document.querySelector("#status")
+    bar.textContent = status.bar ? status.bar.text : ""
+    bar.style.display = status.bar ? null : "none"
+    bar.classList.toggle("error", !!status.bar && status.bar.level === "error")
+
+    if(status.boardMessage && !connector.isReady){
+        changesUiManager.showMessage(status.boardMessage)
+    }
+
+    document.querySelector("#footer").textContent = [status.code, tokenNote(token_info), clockNote(clockOffset()), status.updated, VERSION].filter(Boolean).join(" · ")
+
+    let absences_container = document.querySelector("#absences-container")
+    absences_container.classList.toggle("stale", status.absences === "stale")
+    document.querySelector("#absences-note").textContent = status.absencesNote || ""
+    if(status.absences === "hidden"){
+        absences_container.style.display = "none"
+    }
+
+    if(param_debug){
+        showDebugPanel({scheduler, session: zapi.session, connector, version: VERSION})
+    }
+}
+
 let showTitle = function(){
     document.querySelector("#title").textContent = "Roosterwijzigingen " + connector.date.toLocaleString("nl-NL", {
         weekday: 'long',
@@ -62,67 +147,82 @@ let showTitle = function(){
     })
 }
 
-let dayChanged = function(){
-    changesManager.reset()
-    changesUiManager.refreshTable()
+// Nieuwe dag (plan stap R.7): gisteren weghalen, basisgegevens van vandaag laden en verversen,
+// zonder de pagina te herladen. Zolang de basisgegevens niet geladen zijn, toont het bord een melding.
+let switchDay = async function(date){
+    console.info("New day: " + date.toDateString())
+    let loading = connector.switchDay(date)
     showTitle()
-}
-window.dc = dayChanged
-
-// Laat op het scherm zien als de getoonde gegevens niet actueel zijn.
-let showStatus = function(text){
-    let status = document.querySelector("#status")
-    status.textContent = text || ""
-    status.style.display = text ? null : "none"
-}
-
-// Ververst elke 5 minuten, na een fout al na een minuut. Een nieuwe ronde start pas als de vorige klaar is.
-let keepRefreshing = function(refresh){
-    let run = async function(){
-        let ok = false
-        try {
-            ok = await refresh()
-        }
-        catch(err){
-            console.error(err)
-        }
-        setTimeout(run, ok ? REFRESH_INTERVAL : RETRY_INTERVAL)
+    changesManager.reset()
+    changesUiManager.showMessage("Rooster van " + date.toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"}) + " wordt geladen")
+    absences.reset()
+    absencesUiManager.element.replaceChildren()
+    document.querySelector("#absences-container").style.display = "none"
+    outofoffice.reset()
+    outOfOfficeUiManager.element.replaceChildren()
+    document.querySelector("#outofoffice-container").style.display = "none"
+    try {
+        await loading
+    } catch (e) {
+        // de verversronde probeert het opnieuw (zie ChangesUiManager.refreshTable)
     }
-    run()
+    scheduler.runNow()
 }
+window.dc = switchDay
 
-// Dagwissel-check staat bewust los van het laden van data: ook als het laden
-// faalt (bv. op een dag zonder rooster) moet de pagina weer herladen worden.
-let last_checked_date = new Date();
+let rollover = new DayRollover({
+    currentDate: () => connector.date,
+    fixedDate: !!param_date,
+    onNewDay: switchDay,
+    now: appNow,
+})
+
+// Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
+// Zermelo bereikbaar is, anders later opnieuw. Vervalt zodra stap 3.5 (versiecontrole) er is.
+let nextMaintenance = function(){
+    let at = new Date(appNow())
+    at.setHours(MAINTENANCE_HOUR, 0, 0, 0)
+    if(at.getTime() <= appNow()){
+        at.setDate(at.getDate() + 1)
+    }
+    return at.getTime() + Math.floor(Math.random()*60*60*1000)
+}
+let maintenance_at = nextMaintenance()
+
+// Elke minuut: dagwissel, basisgegevens verversen als ze ouder zijn dan een uur, de
+// onderhoudsherlading en de status. Staat los van het laden van data, zodat het ook werkt als dat faalt.
 let started_at = Date.now()
 setInterval(()=> {
-    if(last_checked_date.toDateString() !== new Date().toDateString()){
-        window.rowizerReload()
+    rollover.check()
+    connector.refreshIfStale()
+
+    if(appNow() >= maintenance_at){
+        let last_success = scheduler.task("changes")?.lastSuccess
+        let healthy = zapi.session.health.state === "ok" && last_success && Date.now() - last_success < 15*60*1000
+        if(healthy){
+            window.rowizerReload("nightly maintenance")
+        } else {
+            maintenance_at = appNow() + 10*60*1000
+        }
     }
-    // Zonder basisgegevens (bv. door een netwerkfout bij het opstarten) kan niets laden: probeer het opnieuw.
-    else if(!connector.isReady && (connector.loadError || Date.now() - started_at > STARTUP_TIMEOUT)){
-        showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
-        window.rowizerReload()
+
+    // Zonder basisgegevens kan niets laden. Heeft de connector een fout, dan probeert hij het zelf
+    // opnieuw (herladen helpt dan niet) en is er dus leven: hartslag voor de waakhond. Is er na
+    // STARTUP_TIMEOUT nog geen enkele laadpoging afgerond, dan hangt er iets: herladen.
+    if(!connector.isReady){
+        if(connector.loadError){
+            window.rowizerHeartbeat = Date.now()
+        } else if(Date.now() - started_at > STARTUP_TIMEOUT){
+            window.rowizerReload("startup stuck")
+        }
     }
+    updateStatus()
 }, RETRY_INTERVAL)
 
-connector.waitUntilReady().then(a=>{
-    let last_update = null
-    keepRefreshing(async ()=>{
-        let ok = await changesUiManager.refreshTable();
-        if(ok){
-            last_update = new Date()
-            showStatus()
-        }
-        else{
-            let time = last_update && last_update.toLocaleTimeString("nl-NL", {hour: '2-digit', minute: '2-digit'})
-            showStatus("Geen verbinding met Zermelo" + (time ? ", laatste update " + time : ""))
-        }
-        return ok
-    })
+connector.waitUntilReady().then(()=>{
+    scheduler.add("changes", () => changesUiManager.refreshTable(), {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
 
-    let absences_allowed = true
-    keepRefreshing(async ()=>{
+    scheduler.add("absences", async ()=>{
         if(!absences_allowed){
             return true
         }
@@ -134,17 +234,18 @@ connector.waitUntilReady().then(a=>{
             return ok
         }
         catch(err){
-            if(err instanceof ZermeloAuthorizationError){
+            // Alleen een ontbrekend recht zet de afwezigen uit; een verlopen token (auth) niet.
+            if(err instanceof ZermeloAuthorizationError && err.kind === "permission"){
                 console.log("No authorization for absences")
                 absences_allowed = false
                 return true
             }
             throw err
         }
-    })
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
 
     let external_location_known = false
-    keepRefreshing(async ()=>{
+    scheduler.add("outofoffice", async ()=>{
         if(!external_location_known){
             await outofoffice.setExternalLocationName(param_external)
             external_location_known = true
@@ -152,12 +253,29 @@ connector.waitUntilReady().then(a=>{
         await outOfOfficeUiManager.refresh()
         document.querySelector("#outofoffice-container").style.display = outofoffice.outOfOffices.length ? null : "none"
         return true
-    })
-}).catch(err=>{
-    console.error(err)
-    showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+
+    // Zelfcontrole van het token (plan stap R.12): eens per dag, na een fout over een uur opnieuw.
+    scheduler.add("token", async ()=>{
+        token_info = await checkToken(zapi.session)
+        return true
+    }, {interval: 24*60*60*1000, retryInterval: 60*60*1000})
+
+    // Klok elk uur opnieuw controleren; na een correctie ziet de dagwissel een andere dag.
+    scheduler.add("clock", async ()=>{
+        await checkClock()
+        rollover.check()
+        return true
+    }, {interval: 60*60*1000, retryInterval: 15*60*1000})
+
+    // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
+    // stroomstoring) lopen daarna niet gelijk.
+    scheduler.start()
 })
 
+connector.onLoad = () => updateStatus()
+
 showTitle()
+updateStatus()
 
 window.rowizerStarted = true

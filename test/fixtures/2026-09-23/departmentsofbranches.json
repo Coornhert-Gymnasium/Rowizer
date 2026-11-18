@@ -1,0 +1,17 @@
+[
+{"id":1002202,"code":"v5","yearOfEducation":5,"educationType":null,"weekTimeTable":54,"educations":[406,451]},
+{"id":1002203,"code":"h5","yearOfEducation":5,"educationType":null,"weekTimeTable":54,"educations":[351]},
+{"id":1002204,"code":"b4","yearOfEducation":4,"educationType":null,"weekTimeTable":40001,"educations":[151]},
+{"id":1002206,"code":"h4","yearOfEducation":4,"educationType":null,"weekTimeTable":54,"educations":[351]},
+{"id":1002208,"code":"hv2","yearOfEducation":2,"educationType":null,"weekTimeTable":54,"educations":[1001202]},
+{"id":1002209,"code":"v4","yearOfEducation":4,"educationType":null,"weekTimeTable":54,"educations":[406,451]},
+{"id":1002210,"code":"b3","yearOfEducation":3,"educationType":null,"weekTimeTable":40001,"educations":[151]},
+{"id":1002211,"code":"k4","yearOfEducation":4,"educationType":null,"weekTimeTable":40001,"educations":[152]},
+{"id":1002212,"code":"k3","yearOfEducation":3,"educationType":null,"weekTimeTable":40001,"educations":[152]},
+{"id":1002213,"code":"bk1","yearOfEducation":1,"educationType":null,"weekTimeTable":40001,"educations":[1001203]},
+{"id":1002214,"code":"v6","yearOfEducation":6,"educationType":null,"weekTimeTable":54,"educations":[406,451]},
+{"id":1002215,"code":"bk2","yearOfEducation":2,"educationType":null,"weekTimeTable":40001,"educations":[152,151]},
+{"id":1002216,"code":"v3","yearOfEducation":3,"educationType":null,"weekTimeTable":54,"educations":[406,451]},
+{"id":1002217,"code":"h3","yearOfEducation":3,"educationType":null,"weekTimeTable":54,"educations":[351]},
+{"id":1002220,"code":"hv1","yearOfEducation":1,"educationType":null,"weekTimeTable":54,"educations":[1001202]}
+]

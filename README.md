@@ -34,6 +34,12 @@ All settings are done by using URL-parameters. Only two (or three, if your schoo
 ```
 https://vlietland-college.github.io/Rowizer?token={API_TOKEN_HERE}&portal={PORTAL_NAME_HERE}
 ```
+> [!TIP]
+> You can also put all parameters after a `#` instead of a `?`, for example
+> `https://vlietland-college.github.io/Rowizer/#token={API_TOKEN_HERE}&portal={PORTAL_NAME_HERE}`.
+> The part after `#` is never sent to the web server, so the token stays between the screen and Zermelo.
+> This is the recommended form; `?` keeps working.
+
 If you have multiple branches, add:
 ```
 &branch={BRANCH_CODE_HERE}
