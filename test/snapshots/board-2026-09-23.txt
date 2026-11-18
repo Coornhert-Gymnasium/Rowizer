@@ -32,31 +32,31 @@
 3 | 4-6 | lesson cancelled | k3.hbr1 men04  vervalt
 3 | 5-5 | lesson | v3c ak dro a258
 4 | 5-5 | lesson cancelled | b4a en bee  vervalt
-4 | 6-6 | lesson | entl men24 leerplein a
 4 | 3-3 | lesson | entl men23 leerplein a
+4 | 6-6 | lesson | entl men24 leerplein a
 4 | 2-2 | lesson cancelled | h4c gd krh  vervalt
 4 | 6-6 | lesson cancelled | k4.bi1 huu  vervalt
 4 | 7-7 | lesson | k4a ma cir a268
-4 | 6-6 | lesson | netl lme leerplein a
 4 | 3-3 | lesson | netl bor leerplein a
+4 | 6-6 | lesson | netl lme leerplein a
 4 | 2-2 | lesson | v4.fatl2 cir a268
 4 | 6-6 | lesson | v4.fatl2 cir a268
 4 | 6-6 | lesson | v4.nat1 qed binask10
 4 | 1-1 | lesson | v4b entl msn a266
 4 | 3-3 | lesson | v4b entl msn a266
-4 | 6-6 | lesson | wisa men27 leerplein a
 4 | 3-3 | lesson | wisa wro a030+1
-5 | 6-6 | lesson | entl men24 leerplein a
+4 | 6-6 | lesson | wisa men27 leerplein a
 5 | 3-3 | lesson | entl men23 leerplein a
+5 | 6-6 | lesson | entl men24 leerplein a
 5 | 4-4 | lesson | h5.entl6 msn a266
 5 | 1-1 | lesson cancelled | h5b gd krh  vervalt
-5 | 6-6 | lesson | netl lme leerplein a
 5 | 3-3 | lesson | netl bor leerplein a
+5 | 6-6 | lesson | netl lme leerplein a
 5 | 1-9 | lesson | swt_a men11 leerplein b
 5 | 6-6 | lesson | v5.fatl2 cir a268
 5 | 6-6 | lesson | v5.nat1 qed binask10
 5 | 3-3 | lesson | v5b entl msn a266
-5 | 6-6 | lesson | wisa men27 leerplein a
 5 | 3-3 | lesson | wisa wro a030+1
+5 | 6-6 | lesson | wisa men27 leerplein a
 6 | 1-9 | lesson | swt_a men11 leerplein b
 6 | 5-5 | lesson | v6b entl msn a266

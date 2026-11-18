@@ -1,5 +1,23 @@
 import ChangesUIRecordClass from "./changesUIRecordClass.js";
 
+const TYPE_ORDER = {activity: 0, exam: 1, lesson: 2}
+
+/**
+ * Eén volgorde voor de items op het bord (plan stap 1.7): activiteiten, toetsen, lessen; daarbinnen
+ * op groepsnaam (h3 voor h10), dan op lesuur. Altijd dezelfde uitkomst, in elke browser.
+ */
+export function compareChanges(a, b) {
+    let type = (TYPE_ORDER[a.appointment.type] ?? 3) - (TYPE_ORDER[b.appointment.type] ?? 3)
+    if (type) {
+        return type
+    }
+    let name = String(a.entity.extendedName || "").localeCompare(String(b.entity.extendedName || ""), "nl", {numeric: true})
+    return name
+        || a.period_start - b.period_start
+        || a.period_end - b.period_end
+        || a.appointment.id - b.appointment.id
+}
+
 export class ChangesUiManager {
 
     constructor(element, connector, manager) {
@@ -199,23 +217,7 @@ export class ChangesUiManager {
         //  dis komt anders als "vervalt" met de oude docent op het bord.
         //do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid), this)
 
-        return changes.sort((a, b) => {
-            if (a.appointment.type !== b.appointment.type) {
-                if (a.appointment.type === 'lesson') {
-                    //activities voor lessen
-                    return 1
-                } else {
-                    return -1
-                }
-            } else if (a.entity !== b.entity) {
-                if (a.entity.extendedName > b.entity.extendedName) {
-                    return 1
-                } else {
-                    return -1
-                }
-            }
-            return 0
-        })
+        return changes.sort(compareChanges)
     }
 
     /**
