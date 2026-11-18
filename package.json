@@ -1,0 +1,13 @@
+{
+  "name": "rowizer",
+  "private": true,
+  "type": "module",
+  "description": "Roosterwijzigingen uit Zermelo op een scherm. Draait zonder build in de browser; dit bestand is alleen voor de tests.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "record-fixtures": "node scripts/record-fixtures.mjs"
+  }
+}
