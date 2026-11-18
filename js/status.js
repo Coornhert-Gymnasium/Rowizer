@@ -22,6 +22,11 @@ function time(ms) {
     return new Date(ms + displayOffset).toLocaleTimeString("nl-NL", {hour: "2-digit", minute: "2-digit"})
 }
 
+/** Bewaarde stand op het bord (plan stap R.16), nog niet ververst en (nog) zonder fout. */
+function restoredNote(restoredAt) {
+    return {level: "info", text: "Bewaarde stand van " + time(restoredAt) + " – wordt bijgewerkt"}
+}
+
 /** Korte code van een fout, bv. "auth 401", "network", "render". */
 export function errorCode(error) {
     if (!error) {
@@ -60,8 +65,9 @@ export function computeStatus(input) {
     let changesError = changesFailure && typeof changesFailure === "object" ? changesFailure : null
 
     if (!isReady) {
+        let noSchoolYear = loadError && loadError.kind === "config" && loadError.reason === "school-year-unknown"
         // Bewaarde stand van vandaag op het bord (plan stap R.16): die laten staan, met de rode balk.
-        if (loadError && input.restoredAt) {
+        if (loadError && input.restoredAt && !noSchoolYear) {
             result.code = errorCode(loadError)
             let connection = CONNECTION_KINDS.includes(loadError.kind)
             result.bar = {level: "error", text: (connection ? "Geen verbinding met Zermelo" : NEUTRAL_TEXT) + " – stand van " + time(input.restoredAt)}
@@ -69,9 +75,9 @@ export function computeStatus(input) {
         }
         if (loadError) {
             result.code = errorCode(loadError)
-            result.boardMessage = loadError.kind === "config" && loadError.reason === "school-year-unknown"
-                ? NO_LESSONS_TEXT
-                : NEUTRAL_TEXT
+            result.boardMessage = noSchoolYear ? NO_LESSONS_TEXT : NEUTRAL_TEXT
+        } else if (input.restoredAt) {
+            result.bar = restoredNote(input.restoredAt)
         }
         return result
     }
@@ -101,6 +107,9 @@ export function computeStatus(input) {
         let shownFrom = lastSuccess || input.restoredAt
         let text = (connection ? "Geen verbinding met Zermelo" : NEUTRAL_TEXT) + (shownFrom ? " – stand van " + time(shownFrom) : "")
         result.bar = {level: age > STALE_ERROR || restored ? "error" : "warn", text}
+    } else if (restored) {
+        // nog geen eigen ronde, maar ook geen fout: zeggen dat dit een bewaarde stand is
+        result.bar = restoredNote(input.restoredAt)
     }
 
     if (absences && absences.lastSuccess) {

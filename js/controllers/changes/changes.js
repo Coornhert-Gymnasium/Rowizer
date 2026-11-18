@@ -238,11 +238,6 @@ class Changes {
 
         })
 
-        // voor wie elk item op het bord komt (plan stap 4.3)
-        modified_appointments.forEach(appointment => {
-            appointment.targets = appointmentTargets(appointment, this.connector)
-        })
-
         // Een groep die vandaag is aangemaakt kent de momentopname nog niet: basisgegevens verversen.
         if(unknown_reference && this.connector.requestRefresh){
             this.connector.requestRefresh()
@@ -254,6 +249,13 @@ class Changes {
         let loaded = JSON.stringify(modified_appointments.sort((a,b)=> a.id - b.id))
         let changed = loaded !== this.#lastLoaded
         this.#lastLoaded = loaded
+
+        // Voor wie elk item op het bord komt (plan stap 4.3). Na de vergelijking hierboven: de doelen
+        // bevatten hele groepen en afdelingen uit de momentopname, die horen niet in die tekst. Een
+        // nieuwe momentopname tekent de view sowieso opnieuw (ChangesUiManager.refreshTable).
+        modified_appointments.forEach(appointment => {
+            appointment.targets = appointmentTargets(appointment, this.connector)
+        })
         this.#appointments = modified_objects_object
         return changed
     }

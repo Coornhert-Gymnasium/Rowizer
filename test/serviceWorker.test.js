@@ -36,9 +36,9 @@ function worker({fetch, timeoutMs}) {
         setTimeout: (fn, ms) => setTimeout(fn, timeoutMs ?? ms),
     }
     vm.runInNewContext(source, context)
-    let handle = request => {
+    let handle = (request, ids = {}) => {
         let response
-        listeners.fetch({request, respondWith: p => { response = p }})
+        listeners.fetch({request, ...ids, respondWith: p => { response = p }})
         return response
     }
     return {handle, store, listeners, context}
@@ -69,12 +69,26 @@ test("de pagina onder één sleutel, ongeacht query en fragment", async () => {
     assert.equal((await w.handle(get("?v=2", "navigate"))).body, "pagina")
 })
 
-test("webhost hangt: na de time-out de bewaarde versie", async () => {
+test("webhost hangt: na de time-out de bewaarde pagina", async () => {
     let hang = false
     let w = worker({fetch: () => hang ? new Promise(() => {}) : Promise.resolve(response("v1")), timeoutMs: 10})
-    await w.handle(get("styles.css"))
+    await w.handle(get("", "navigate"))
     hang = true
-    assert.equal((await w.handle(get("styles.css"))).body, "v1")
+    assert.equal((await w.handle(get("", "navigate"))).body, "v1")
+})
+
+test("pagina uit de cache: al haar bestanden ook, geen mix van oud en nieuw", async () => {
+    let version = "oud", hang = false
+    let w = worker({fetch: req => hang && req.mode === "navigate" ? new Promise(() => {}) : Promise.resolve(response(version)), timeoutMs: 10})
+    await w.handle(get("", "navigate"))
+    await w.handle(get("js/script.js"))
+    // nieuwe versie op de server, maar de pagina zelf komt niet op tijd
+    version = "nieuw"
+    hang = true
+    assert.equal((await w.handle(get("", "navigate"), {resultingClientId: "c2"})).body, "oud")
+    assert.equal((await w.handle(get("js/script.js"), {clientId: "c2"})).body, "oud", "uit de cache, niet van het netwerk")
+    // een andere pagina die gewoon van het netwerk kwam, krijgt de nieuwe bestanden
+    assert.equal((await w.handle(get("js/script.js"), {clientId: "c3"})).body, "nieuw")
 })
 
 test("Zermelo, HEAD-verzoeken en foutantwoorden blijven buiten de worker of de cache", async () => {

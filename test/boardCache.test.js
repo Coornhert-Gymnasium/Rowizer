@@ -80,3 +80,18 @@ test("status: na een geslaagde ronde telt de bewaarde stand niet meer", () => {
     })
     assert.equal(status.bar, null)
 })
+
+test("status: bewaarde stand, nog geen eigen ronde en geen fout: rustige melding", () => {
+    let loading = computeStatus({now: entry.savedAt + 60*60*1000, isReady: false, restoredAt: entry.savedAt})
+    assert.deepEqual(loading.bar, {level: "info", text: "Bewaarde stand van 09:05 – wordt bijgewerkt"})
+    let now = entry.savedAt + 60*60*1000
+    let ready = computeStatus({now, isReady: true, health: {state: "ok"}, changes: {addedAt: now - 5000, lastSuccess: null, lastError: null}, restoredAt: entry.savedAt})
+    assert.equal(ready.bar.level, "info")
+})
+
+test("status: schooljaar onbekend gaat voor een bewaarde stand", () => {
+    let status = computeStatus({now: entry.savedAt, isReady: false, restoredAt: entry.savedAt,
+        loadError: {kind: "config", reason: "school-year-unknown", code: "config"}})
+    assert.equal(status.boardMessage, "Vandaag geen lessen")
+    assert.equal(status.bar, null)
+})

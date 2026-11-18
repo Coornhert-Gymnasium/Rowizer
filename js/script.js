@@ -143,13 +143,16 @@ if(board_storage){
     }
 }
 let saveShownBoard = function(){
-    if(!board_storage || !changesUiManager.tableReady || !connector.isCurrent){
+    // De stand is die van de laatste geslaagde wijzigingenronde, ook als dit na de afwezigen gebeurt.
+    // Zelfde klok als de status (Date.now): die telt de klokcorrectie er bij het tonen zelf bij.
+    let changes_success = scheduler.task("changes")?.lastSuccess
+    if(!board_storage || !changes_success || !changesUiManager.tableReady || !connector.isCurrent){
         return
     }
     saveBoard(board_storage, {
         day: connector.date.toDateString(),
         scope: board_scope,
-        savedAt: appNow(),
+        savedAt: changes_success,
         board: document.querySelector("#content-container").innerHTML,
         absences: absencesUiManager.element.innerHTML,
     })
@@ -212,6 +215,7 @@ let updateStatus = function(){
     bar.textContent = status.bar ? status.bar.text : ""
     bar.style.display = status.bar ? null : "none"
     bar.classList.toggle("error", !!status.bar && status.bar.level === "error")
+    bar.classList.toggle("info", !!status.bar && status.bar.level === "info")
 
     if(status.boardMessage && !connector.isReady){
         changesUiManager.showMessage(status.boardMessage)
