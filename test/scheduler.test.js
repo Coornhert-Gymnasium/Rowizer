@@ -83,6 +83,21 @@ test("runNow start direct, maar nooit twee rondes van dezelfde taak tegelijk", a
     assert.equal(maxRunning, 1)
 })
 
+test("verversen na een gebeurtenis hoogstens eens per minuut", async () => {
+    let timers = fakeTimers()
+    let s = scheduler(timers)
+    let runs = 0
+    s.add("changes", async () => { runs++; return true })
+    assert.equal(s.runAfterEvent(), true)
+    await new Promise(resolve => setImmediate(resolve))
+    timers.t += 30*1000
+    assert.equal(s.runAfterEvent(), false)
+    timers.t += 31*1000
+    assert.equal(s.runAfterEvent(), true)
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(runs, 2)
+})
+
 test("onRound wordt na elke ronde aangeroepen", async () => {
     let timers = fakeTimers()
     let rounds = []

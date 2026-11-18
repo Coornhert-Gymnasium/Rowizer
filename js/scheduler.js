@@ -6,6 +6,8 @@
  * lopen. Een ronde begint pas als de vorige van dezelfde taak klaar is. Na elke afgeronde ronde
  * (geslaagd of niet) wordt de hartslag bijgewerkt; de waakhond in index.html kijkt daarnaar.
  */
+const EVENT_MIN_INTERVAL = 60*1000
+
 export default class Scheduler {
     #tasks = []
     #started = false
@@ -73,15 +75,29 @@ export default class Scheduler {
         this.#tasks.filter(t => !name || t.name === name).forEach(task => this.#runTask(task))
     }
 
+    /**
+     * Na een gebeurtenis (netwerk terug, scherm weer zichtbaar) direct verversen, maar hoogstens
+     * eens per minuut: een scherm dat steeds aan en uit gaat mag het verzoekbudget niet opmaken.
+     * @return {boolean} of er ververst wordt
+     */
+    runAfterEvent() {
+        if (this.lastEventRun && this.now() - this.lastEventRun < EVENT_MIN_INTERVAL) {
+            return false
+        }
+        this.lastEventRun = this.now()
+        this.runNow()
+        return true
+    }
+
     /** Hooks voor de browser: direct verversen als het netwerk terugkomt of het scherm weer zichtbaar wordt. */
     listen(target = globalThis.window, doc = globalThis.document) {
         if (target && target.addEventListener) {
-            target.addEventListener("online", () => this.runNow())
+            target.addEventListener("online", () => this.runAfterEvent())
         }
         if (doc && doc.addEventListener) {
             doc.addEventListener("visibilitychange", () => {
                 if (doc.visibilityState === "visible") {
-                    this.runNow()
+                    this.runAfterEvent()
                 }
             })
         }

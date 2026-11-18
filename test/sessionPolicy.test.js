@@ -70,13 +70,13 @@ test("nooit meer dan 2 verzoeken tegelijk", async () => {
     assert.equal(maxActive, 2)
 })
 
-test("budget: het 61e verzoek in een uitbarsting wacht niet eindeloos maar faalt als 'rate'", async () => {
+test("budget: het 101e verzoek in een uitbarsting wacht niet eindeloos maar faalt als 'rate'", async () => {
     let {session, fetch} = setup([ok])
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 100; i++) {
         await session.request("x")
     }
     await assert.rejects(session.request("x"), e => e.kind === "rate" && e.local === true)
-    assert.equal(fetch.calls.length, 60)
+    assert.equal(fetch.calls.length, 100)
     assert.equal(session.budget.hits, 1)
     // het eigen budget is geen storing van Zermelo
     assert.equal(session.health.state, "ok")
@@ -84,23 +84,23 @@ test("budget: het 61e verzoek in een uitbarsting wacht niet eindeloos maar faalt
 
 test("budget: met ruimte binnen 2 minuten wacht het verzoek en gaat het door", async () => {
     let {session, fetch, clock} = setup([ok])
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 100; i++) {
         await session.request("x")
     }
     clock.advance(9*MINUTE)
     await session.request("x")
-    assert.equal(fetch.calls.length, 61)
-    assert.ok(session.budget.lastWindow <= 60)
+    assert.equal(fetch.calls.length, 101)
+    assert.ok(session.budget.lastWindow <= 100)
 })
 
 test("budget overleeft een paginaherlading", async () => {
     let store = memoryStore()
     let first = setup([ok], {store})
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 100; i++) {
         await first.session.request("x")
     }
     let second = new Session("demo", "token", {fetch: first.fetch, now: first.clock.now, sleep: first.clock.sleep, store})
-    assert.equal(second.budget.lastWindow, 60)
+    assert.equal(second.budget.lastWindow, 100)
     await assert.rejects(second.request("x"), e => e.kind === "rate")
 })
 

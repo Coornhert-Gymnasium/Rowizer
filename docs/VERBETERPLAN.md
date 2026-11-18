@@ -254,7 +254,7 @@ Ontwerpprincipes voor alle stappen:
   |---|---|---|
   | Gelijktijdige verzoeken | 2 | – |
   | Tussenruimte tussen twee verzoeken | minimaal 250 ms | – |
-  | Per 10 minuten (schuivend venster) | 60 | ongeveer 14; bij opstarten ongeveer 20; met R.15 ongeveer 24 |
+  | Per 10 minuten (schuivend venster) | 100 | ongeveer 14; bij opstarten ongeveer 20; met R.15 ongeveer 24 |
   | Per etmaal | 2500 | ongeveer 1000 binnen het venster 06:30-18:00 |
 
   De waarden gelden per scherm en staan als constanten bovenaan `session.js`. Geen
@@ -267,7 +267,7 @@ Ontwerpprincipes voor alle stappen:
   hem daarom in `window.name` naast de herlaadteller van R.11, zodat een herlaadlus het
   budget niet omzeilt.
 - Tests met `node:test` mock-timers: wachttijden, de bovengrens, herstel na één geslaagd
-  proefverzoek, het 61e verzoek binnen 10 minuten wacht, en het budget overleeft een
+  proefverzoek, het 101e verzoek binnen 10 minuten wacht, en het budget overleeft een
   nagebootste herlading.
 
 **R.4 Basisgegevens als momentopname (R6, R16)**
@@ -409,7 +409,7 @@ Ontwerpprincipes voor alle stappen:
   | S2 | Netwerk terug | Binnen 1 interval ververst; balk weg |
   | S3 | Zermelo geeft 503 met HTML | Als S1 |
   | S4 | Zermelo geeft 429 | Wachttijd volgens `Retry-After`; geen retry-storm |
-  | S4b | Kunstmatige lus die blijft verversen | Na 60 verzoeken in 10 min wachten de volgende; bord blijft staan; teller in diagnose |
+  | S4b | Kunstmatige lus die blijft verversen | Na 100 verzoeken in 10 min wachten de volgende; bord blijft staan; teller in diagnose |
   | S5 | Token ingetrokken tijdens bedrijf (401) | Bord blijft staan; neutrale melding en code `auth 401`; proefverzoek elke 10 min |
   | S6 | Verzoek blijft hangen | Afgebroken na 30 s; behandeld als S1 |
   | S7 | Antwoord met afgekapte JSON of `totalRows` > rijen | Ronde telt als mislukt; vorige stand blijft |
@@ -640,4 +640,4 @@ zoals hier besloten.
 | 7 | Speler | Chromium 145.0.7632.116 op een Raspberry Pi met Debian 12 (bookworm), tijdzone Amsterdam | Zie werkafspraak 4. R.16 en R.17 zijn zinvol en worden uitgevoerd. R.6: de tijdzone is goed, maar een Pi heeft geen klok met batterij; de klokcontrole blijft dus nodig |
 | 8 | Dagroosters per afdeling (R.5) | Het Coornhert gebruikt er geen verschillende | R.5 in de eenvoudige vorm: één dagrooster, met een waarschuwing in de diagnose als er meer blijken te zijn |
 | 9 | Meldingen op het scherm (R.10) | Neutrale tekst op het scherm, technische details alleen in het diagnosepaneel | Teksten in R.10 en R.12 aangepast |
-| 10 | Zermelo-limieten | Zermelo hanteert geen verzoeklimiet per token. De app houdt zichzelf aan een eigen budget: 60 verzoeken per 10 minuten en 2500 per etmaal, per scherm | Budget en retrybeleid uit R.3 uitvoeren |
+| 10 | Zermelo-limieten | Zermelo hanteert geen verzoeklimiet per token. De app houdt zichzelf aan een eigen budget: 100 verzoeken per 10 minuten en 2500 per etmaal, per scherm | Budget en retrybeleid uit R.3 uitvoeren. Eerst 60 per 10 minuten; bij het testen op 18-11-2026 verhoogd naar 100, omdat twee keer verversen plus een paar extra rondes (elk opstarten ~20 verzoeken inclusief herhalingen) het bord minutenlang leeg liet |

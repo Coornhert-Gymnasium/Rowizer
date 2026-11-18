@@ -18,7 +18,9 @@ const LIMITS = {
     concurrent: 2,
     spacing: 250,
     windowLength: 10*60*1000,
-    windowMax: 60,
+    // 60 bleek in de praktijk te krap: twee keer verversen (elk ~20 verzoeken met herhalingen)
+    // plus een paar extra rondes liet het bord minutenlang leeg. 100 is nog ~7x normaal gebruik.
+    windowMax: 100,
     dayMax: 2500,
     maxWait: 2*60*1000,
 }
