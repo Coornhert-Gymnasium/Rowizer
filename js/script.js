@@ -80,10 +80,10 @@ let switchDay = async function(date){
     changesManager.reset()
     changesUiManager.showMessage("Rooster van " + date.toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "long"}) + " wordt geladen")
     absences.reset()
-    absencesUiManager.element.innerHTML = ""
+    absencesUiManager.element.replaceChildren()
     document.querySelector("#absences-container").style.display = "none"
     outofoffice.reset()
-    outOfOfficeUiManager.element.innerHTML = ""
+    outOfOfficeUiManager.element.replaceChildren()
     document.querySelector("#outofoffice-container").style.display = "none"
     try {
         await loading

@@ -19,8 +19,9 @@ export class AbsencesUiManager {
             //console.log(unique_employees)
         }
 
-        let absences_ui_items = absences.map(abs => new AbsenceUiRecord(abs))
-        absences_ui_items.forEach(abui => this.element.append(abui.getElement()))
+        // eerst alles opbouwen, dan in één keer plaatsen: een fout laat de vorige lijst staan
+        let elements = absences.map(abs => new AbsenceUiRecord(abs).getElement())
+        this.element.replaceChildren(...elements)
     }
 
     merge(){
@@ -36,7 +37,6 @@ export class AbsencesUiManager {
         //TODO: this is quick n dirty way to show the new changes
         try{
             if (await this.absencesManager.loadAll()) {
-                this.element.innerHTML = ""
                 this.render()
             }
             return true

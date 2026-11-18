@@ -12,14 +12,16 @@ export class OutOfOfficeUiManager {
     render() {
         let outOfOffices = this.outOfOfficeManager.outOfOffices;
 
-        let absences_ui_items = outOfOffices.map(abs => new OutOfOfficeUiRecord(abs))
-        absences_ui_items.forEach(abui => {
+        let elements = []
+        outOfOffices.map(abs => new OutOfOfficeUiRecord(abs)).forEach(abui => {
             try {
-                this.element.append(abui.getElement())
+                elements.push(abui.getElement())
             } catch (e) {
                 console.warn("Could not show out of office item", e, abui.outOfOffice)
             }
         })
+        // in één keer plaatsen
+        this.element.replaceChildren(...elements)
     }
 
     merge(){
@@ -31,7 +33,6 @@ export class OutOfOfficeUiManager {
         //TODO: this is quick n dirty way to show the new changes
         let changes = await this.outOfOfficeManager.loadAll()
         if (Object.keys(changes).length) {
-            this.element.innerHTML = ""
             this.render()
         }
     }

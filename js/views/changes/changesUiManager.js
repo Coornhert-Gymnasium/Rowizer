@@ -17,6 +17,10 @@ export class ChangesUiManager {
         this.date = date
     }
 
+    /**
+     * Bouwt het lege raster, los van de pagina.
+     * @return {HTMLElement}
+     */
     makeTable() {
         let yearsOfEducation = Object.keys(this.connector.yearsOfEducation).sort()
         let timeslots = Object.values(this.connector.timeslots).sort((a, b) => a.rank - b.rank)
@@ -41,7 +45,7 @@ export class ChangesUiManager {
         timeslots.forEach(slot => {
             let el = document.createElement('div')
             el.classList.add("timeslot-header")
-            el.innerHTML = slot.name
+            el.textContent = slot.name
             el.setAttribute('data-timeslot', slot.rank)
             timeslots_box.append(el)
         })
@@ -51,7 +55,7 @@ export class ChangesUiManager {
             el.classList.add("year-row", "schedule-flex")
             let year_cell = document.createElement('div')
             year_cell.classList.add("schedule-flex", "header", "year-header")
-            year_cell.innerHTML = year
+            year_cell.textContent = year
             el.append(year_cell)
 
             let content_cell = document.createElement('div')
@@ -63,13 +67,16 @@ export class ChangesUiManager {
             content_cell.append(content_container)
             container.append(el)
         })
-        this.element.append(container)
-        this.scroller.start()
+        return container
     }
 
-    fillTable() {
+    /**
+     * Zet de items in het raster van makeTable().
+     * @param table het raster, nog niet op de pagina
+     */
+    fillTable(table) {
         this.collectChanges().forEach(change => {
-            let container = document.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
+            let container = table.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
             if (!container) {
                 // geen rij voor deze jaarlaag, bv. een genegeerde afdeling of een afdeling zonder leerjaar
                 return
@@ -221,6 +228,7 @@ export class ChangesUiManager {
                 await this.connector.reload()
             } catch (e) {
                 console.error(e)
+                this.lastFailure = "load"
                 return false
             }
         }
@@ -230,6 +238,7 @@ export class ChangesUiManager {
         }
         catch (e){
             console.error(e)
+            this.lastFailure = "load"
             return false;
 
         }
@@ -237,20 +246,26 @@ export class ChangesUiManager {
         // en na nieuwe basisgegevens (bv. een groep die vandaag is aangemaakt).
         let snapshot = this.connector.snapshot
         if (!this.tableReady || changed || snapshot !== this.drawnSnapshot) {
-            this.tableReady = false
+            // Eerst los opbouwen, dan in één keer plaatsen: een fout laat het vorige beeld staan
+            // (plan stap R.9).
+            let table
             try {
-                this.scroller.stop()
-                this.element.innerHTML = ""
-                this.makeTable()
-                this.fillTable()
-                this.tableReady = true
-                this.drawnSnapshot = snapshot
+                table = this.makeTable()
+                this.fillTable(table)
             }
             catch (e){
-                console.error(e)
+                console.error("Could not draw the board, keeping the previous one", e)
+                this.lastFailure = "render"
                 return false
             }
+            let scrolled = this.scroller.position()
+            this.scroller.stop()
+            this.element.replaceChildren(table)
+            this.tableReady = true
+            this.drawnSnapshot = snapshot
+            this.scroller.start(scrolled)
         }
+        this.lastFailure = null
         return true
     }
 
@@ -271,9 +286,19 @@ class ChangesUIScroller{
     #timeout;
     #frame;
 
-    start(){
+    /**
+     * @param from scrollpositie om verder te gaan (na opnieuw tekenen); wordt 0 als de inhoud
+     *        nu korter is
+     */
+    start(from = 0){
         this.stop()
-        this.#scrollDown()
+        this.#scrollDown(from)
+    }
+
+    /** De huidige scrollpositie van de rijen. */
+    position(){
+        let rows = [...document.querySelectorAll(".schedule-content")]
+        return Math.max(0, ...rows.map(row => row.scrollTop))
     }
 
     stop(){
@@ -281,7 +306,7 @@ class ChangesUIScroller{
         cancelAnimationFrame(this.#frame)
     }
 
-    #scrollDown(){
+    #scrollDown(from = 0){
         // Elke ronde opnieuw meten: de rij met de meeste inhoud bepaalt hoe ver alle rijen meescrollen.
         let rows = [...document.querySelectorAll(".schedule-content")]
         let overflow = Math.max(0, ...rows.map(row => row.scrollHeight - row.clientHeight))
@@ -289,7 +314,9 @@ class ChangesUIScroller{
             this.#timeout = setTimeout(() => this.#scrollDown(), 1000)
             return
         }
-        this.#animate(rows, 0, overflow, overflow*150, () => {
+        // verder waar we waren, tenzij de inhoud korter is geworden
+        from = from > overflow ? 0 : from
+        this.#animate(rows, from, overflow, (overflow - from)*150, () => {
             this.#timeout = setTimeout(() => {
                 this.#animate(rows, overflow, 0, 300, () => this.#scrollDown())
             }, 1000)
