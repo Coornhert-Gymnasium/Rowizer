@@ -1,5 +1,40 @@
 import ChangesUIRecordClass from "./changesUIRecordClass.js";
 
+const TYPE_ORDER = {activity: 0, exam: 1, lesson: 2}
+
+export const NO_LESSONS_TEXT = "Vandaag geen lessen"
+export const NO_CHANGES_TEXT = "Geen roosterwijzigingen"
+
+/**
+ * Wat het bord toont als er niets is (plan stap 1.5). Items gaan altijd voor: ontbreekt het
+ * weekrooster door een fout in de gegevens, dan mogen echte wijzigingen niet verdwijnen.
+ * @param lessonsToday aantal lesuren vandaag
+ * @param itemCount aantal items op het bord
+ * @return {"no-lessons"|"no-changes"|null}
+ */
+export function emptyState(lessonsToday, itemCount) {
+    if (itemCount) {
+        return null
+    }
+    return lessonsToday ? "no-changes" : "no-lessons"
+}
+
+/**
+ * Eén volgorde voor de items op het bord (plan stap 1.7): activiteiten, toetsen, lessen; daarbinnen
+ * op groepsnaam (h3 voor h10), dan op lesuur. Altijd dezelfde uitkomst, in elke browser.
+ */
+export function compareChanges(a, b) {
+    let type = (TYPE_ORDER[a.appointment.type] ?? 3) - (TYPE_ORDER[b.appointment.type] ?? 3)
+    if (type) {
+        return type
+    }
+    let name = String(a.entity.extendedName || "").localeCompare(String(b.entity.extendedName || ""), "nl", {numeric: true})
+    return name
+        || a.period_start - b.period_start
+        || a.period_end - b.period_end
+        || a.appointment.id - b.appointment.id
+}
+
 export class ChangesUiManager {
 
     constructor(element, connector, manager) {
@@ -75,6 +110,7 @@ export class ChangesUiManager {
      * @param table het raster, nog niet op de pagina
      */
     fillTable(table) {
+        let placed = 0
         this.collectChanges().forEach(change => {
             let container = table.querySelector("#schedule-content-year-" + change.departmentOfBranch.yearOfEducation)
             if (!container) {
@@ -83,11 +119,13 @@ export class ChangesUiManager {
             }
             try {
                 container.append(change.getElement())
+                placed++
             } catch (e) {
                 console.warn("Could not show appointment " + change.appointment.id, e, change.appointment)
             }
 
         })
+        return placed
     }
 
     /**
@@ -165,7 +203,8 @@ export class ChangesUiManager {
                             }
                             // Maak een fake group, met naam uit "subject" van de afspraak, en extended name uit "remark" van de afspraak. 
                             // Niet elke afspraak heeft een vak: gebruik dan alleen de opmerking als naam.
-                            let subject = appointment.subjects[0]
+                            // alfabetisch eerste vak, zoals het bord altijd toonde (zie appointmentText.js)
+                            let subject = [...appointment.subjects].sort()[0]
                             let remark = subject ? subject.substring(0, 6) : ""
                             if (appointment.type === "exam" || !subject) {
                                 // toetsen krijgen uitgebreide beschrijving:
@@ -198,23 +237,7 @@ export class ChangesUiManager {
         //  dis komt anders als "vervalt" met de oude docent op het bord.
         //do_app(app_filtered.filter(app => app.type === "lesson" && !app.valid), this)
 
-        return changes.sort((a, b) => {
-            if (a.appointment.type !== b.appointment.type) {
-                if (a.appointment.type === 'lesson') {
-                    //activities voor lessen
-                    return 1
-                } else {
-                    return -1
-                }
-            } else if (a.entity !== b.entity) {
-                if (a.entity.extendedName > b.entity.extendedName) {
-                    return 1
-                } else {
-                    return -1
-                }
-            }
-            return 0
-        })
+        return changes.sort(compareChanges)
     }
 
     /**
@@ -249,14 +272,29 @@ export class ChangesUiManager {
             // Eerst los opbouwen, dan in één keer plaatsen: een fout laat het vorige beeld staan
             // (plan stap R.9).
             let table
+            let state
             try {
                 table = this.makeTable()
-                this.fillTable(table)
+                state = emptyState(this.connector.getTodayTimeSlots().length, this.fillTable(table))
             }
             catch (e){
                 console.error("Could not draw the board, keeping the previous one", e)
                 this.lastFailure = "render"
                 return false
+            }
+            if (state === "no-lessons") {
+                // weekend of vrije dag: geen leeg raster
+                this.showMessage(NO_LESSONS_TEXT)
+                this.drawnSnapshot = snapshot
+                this.lastFailure = null
+                this.tableReady = true
+                return true
+            }
+            if (state === "no-changes") {
+                let message = document.createElement("div")
+                message.classList.add("board-empty")
+                message.textContent = NO_CHANGES_TEXT
+                table.append(message)
             }
             let scrolled = this.scroller.position()
             this.scroller.stop()

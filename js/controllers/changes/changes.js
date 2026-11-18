@@ -122,7 +122,8 @@ class Changes {
 
                 let startTime = new Date(appointment.start * 1000).getHours() + ":" + ("00" + new Date(appointment.start * 1000).getMinutes()).slice(-2)
                 let endTime = new Date(appointment.end * 1000).getHours() + ":" + ("00" + new Date(appointment.end * 1000).getMinutes()).slice(-2)
-                appointment.locations[0] = [appointment.locations[0], startTime + "-" + endTime].filter(Boolean).join(" ")
+                // de tijd apart bewaren: niet aan het eerste lokaal plakken (plan stap 1.3)
+                appointment.timeLabel = startTime + "-" + endTime
                 
                 let startSlot = timeslots.find(slot=> appointment.start <= slot.endDt.getTime()/1000)
                 let startSlotIndex = timeslots.indexOf(startSlot) + 1;

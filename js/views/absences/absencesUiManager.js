@@ -1,4 +1,4 @@
-import AbsenceUiRecord from "./absenceUiRecord.js";
+import {mergeAbsences, absenceText} from "../../controllers/absences/mergeAbsences.js";
 import {ZermeloAuthorizationError} from "../../zermelo/utils/errors.js";
 
 export class AbsencesUiManager {
@@ -11,21 +11,17 @@ export class AbsencesUiManager {
     }
 
     render() {
-        let absences = Object.values(this.absencesManager.absences).filter(abs => abs.employee);
-        absences.sort((a, b) => a.employee.localeCompare(b.employee))
-        let unique_employees = [...new Set(absences.map(abs=>abs.employee).filter((e, i, a) => a.indexOf(e) !== i))]
-        if(unique_employees.length){
-            //there are duplicates in the absences
-            //console.log(unique_employees)
-        }
+        // Eén regel per docent, met de lesuren als bereik (plan stap 1.1).
+        let merged = mergeAbsences(Object.values(this.absencesManager.absences), this.connector.getTodayTimeSlots())
 
         // eerst alles opbouwen, dan in één keer plaatsen: een fout laat de vorige lijst staan
-        let elements = absences.map(abs => new AbsenceUiRecord(abs).getElement())
+        let elements = merged.map(item => {
+            let el = document.createElement("div")
+            el.classList.add("absence")
+            el.textContent = absenceText(item)
+            return el
+        })
         this.element.replaceChildren(...elements)
-    }
-
-    merge(){
-
     }
 
 
