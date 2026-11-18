@@ -30,17 +30,19 @@ class ZermeloApi  {
             key
         } = options;
 
-        options = Object.assign(options, {
+        let {session, ...settings} = options
+
+        settings = Object.assign(settings, {
             version: 3,
         });
 
-        Object.assign(this, options);
+        Object.assign(this, settings);
 
         this.#url = "https://"+this.portal+".zportal.nl/api/v"+this.version+"/"
 
         //this.test =   new SwaggerClient('https://'+this.portal+'.zportal.nl/static/swagger/api-docs.json')
         // een eigen sessie kan worden meegegeven, bv. voor de tests
-        this.#session = options.session || new Session(this.portal, this.token);
+        this.#session = session || new Session(this.portal, this.token);
 
         this.schools = new SchoolsManager(this.#session);
         this.appointments = new AppointmentsManager(this.#session);
