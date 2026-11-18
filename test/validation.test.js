@@ -6,11 +6,12 @@ import Session from "../js/zermelo/utils/session.js"
 import AppointmentsManager from "../js/zermelo/lib/appointments/appointmentsManager.js"
 import GroupInDepartmentsManager from "../js/zermelo/lib/groupInDepartments/groupInDepartmentsManager.js"
 import diagnostics from "../js/diagnostics.js"
-import {zermeloResponse, scriptedFetch} from "./helpers/fakeFetch.js"
+import {zermeloResponse, scriptedFetch, virtualClock, memoryStore} from "./helpers/fakeFetch.js"
 
 function sessionReturning(body) {
     let fetch = scriptedFetch([() => body()])
-    return {fetch, session: new Session("demo", "token", {fetch, retryDelays: [1, 1]})}
+    let clock = virtualClock()
+    return {fetch, session: new Session("demo", "token", {fetch, retryDelays: [1, 1], now: clock.now, sleep: clock.sleep, store: memoryStore()})}
 }
 
 test("totalRows groter dan het aantal rijen: data-fout, opnieuw geprobeerd", async () => {

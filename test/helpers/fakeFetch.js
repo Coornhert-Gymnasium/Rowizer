@@ -15,6 +15,26 @@ export function htmlResponse(status) {
 }
 
 /**
+ * Virtuele klok: sleep() zet de tijd direct vooruit, zodat wachttijden van minuten niets kosten.
+ */
+export function virtualClock(start = new Date(2026, 8, 23, 8, 0).getTime()) {
+    let clock = {t: start, sleeps: []}
+    clock.now = () => clock.t
+    clock.sleep = ms => {
+        clock.sleeps.push(Math.round(ms))
+        clock.t += Math.max(0, ms)
+        return new Promise(resolve => setImmediate(resolve))
+    }
+    clock.advance = ms => { clock.t += ms }
+    return clock
+}
+
+export function memoryStore(initial) {
+    let saved = initial
+    return {load: () => saved, save: budget => { saved = structuredClone(budget) }, get saved() { return saved }}
+}
+
+/**
  * @param handlers lijst van (url, attempt) => Response | Error, één per poging; de laatste wordt herhaald
  */
 export function scriptedFetch(handlers) {

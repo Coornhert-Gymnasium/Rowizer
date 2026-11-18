@@ -4,11 +4,12 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import Session from "../js/zermelo/utils/session.js"
 import {ZermeloAuthorizationError, ZermeloError} from "../js/zermelo/utils/errors.js"
-import {zermeloResponse, htmlResponse, scriptedFetch} from "./helpers/fakeFetch.js"
+import {zermeloResponse, htmlResponse, scriptedFetch, virtualClock, memoryStore} from "./helpers/fakeFetch.js"
 
 function session(handlers) {
     let fetch = scriptedFetch(handlers)
-    return {fetch, session: new Session("demo", "token", {fetch, retryDelays: [1, 1]})}
+    let clock = virtualClock()
+    return {fetch, session: new Session("demo", "token", {fetch, retryDelays: [1, 1], now: clock.now, sleep: clock.sleep, store: memoryStore()})}
 }
 
 async function kindOf(handlers) {

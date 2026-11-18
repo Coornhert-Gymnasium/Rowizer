@@ -69,6 +69,11 @@ class ZermeloApi  {
 
     }
 
+    /** De sessie, voor de storingstoestand en het verzoekbudget. */
+    get session(){
+        return this.#session
+    }
+
 }
 
 
