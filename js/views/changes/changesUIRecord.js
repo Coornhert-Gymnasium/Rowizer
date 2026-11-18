@@ -44,10 +44,23 @@ export class ChangesUIRecord {
         el.classList.add(...this.getClassNames())
 
         //for activities use real times
-        el.style.setProperty('--start-hour', this.period_start);
-        el.style.setProperty('--end-hour', this.period_end);
+        // kolommen uit ChangesUiManager.fillTable (plan stap 2.2), anders het lesuur zelf
+        el.style.setProperty('--start-hour', this.columnStart ?? this.period_start);
+        el.style.setProperty('--end-hour', this.columnEnd ?? this.period_end);
         el.setAttribute('data-appointment-id', this.appointment.id);
-        el.innerText = this.getInnerText()
+        // voor het dimmen van voorbije items (plan stap 2.3)
+        el.dataset.endRank = this.period_end;
+        let text = this.getInnerText()
+        // "vervalt" apart, zodat het opvalt (plan stap 2.5); de tekst zelf blijft gelijk
+        let cancelled = text.match(/^(.*?)((?:toets )?vervalt)$/s)
+        if (cancelled) {
+            let word = document.createElement("span")
+            word.classList.add("cancelled-word")
+            word.textContent = cancelled[2]
+            el.append(document.createTextNode(cancelled[1]), word)
+        } else {
+            el.innerText = text
+        }
 
         this.element = el
         return this.element

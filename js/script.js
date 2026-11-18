@@ -34,6 +34,12 @@ console.log("Rowizer loaded, version " + VERSION)
 let params = readSettings(window.location)
 let param_debug = params.get("debug") === "1"
 
+// Grootte van alles op het scherm bijstellen zonder browserzoom (plan stap 2.1), bv. scale=1.2.
+let param_scale = parseFloat(params.get("scale"))
+if(Number.isFinite(param_scale) && param_scale >= 0.5 && param_scale <= 3){
+    document.documentElement.style.setProperty("--scale", param_scale)
+}
+
 // Zonder portal of token kan niets (plan stap 1.4): instelscherm, geen verzoeken naar Zermelo.
 // De waakhond (index.html) krijgt een hartslag, want herladen lost dit niet op. De lege belofte
 // houdt de rest van deze module tegen.
@@ -209,6 +215,7 @@ let started_at = Date.now()
 setInterval(()=> {
     rollover.check()
     connector.refreshIfStale()
+    changesUiManager.markTime()
 
     if(appNow() >= maintenance_at){
         let last_success = scheduler.task("changes")?.lastSuccess

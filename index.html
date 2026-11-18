@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="nl">
 <head>
     <meta charset="utf-8">
+    <title>Roosterwijzigingen</title>
     <!-- het token staat in de URL: nooit als referrer meesturen -->
     <meta name="referrer" content="no-referrer">
     <base target="_top">
@@ -84,16 +85,12 @@
     </script>
     <script src="js/script.js" type="module"></script>
     <script src="js/clock.js" type="module"></script>
-<!--    <script src='//unpkg.com/swagger-client' type='text/javascript'></script>-->
 
     <link href="styles.css" rel="stylesheet">
 </head>
 
 <body>
 
-<style>
-
-</style>
 <div class="flex" id="wrapper">
     <div class="flex flex-fill">
         <div class="flex" id="title"></div>
@@ -109,6 +106,13 @@
 
     </div>
     <div class="flex flex-fill" id="content-container">
+    </div>
+    <!-- legenda (plan stap 2.4); "bijgewerkt" staat rechtsonder in #footer -->
+    <div class="flex" id="legend">
+        <span class="legend-item"><span class="swatch activity"></span>activiteit</span>
+        <span class="legend-item"><span class="swatch exam"></span>toets</span>
+        <span class="legend-item"><span class="swatch cancelled"></span>vervalt</span>
+        <span class="legend-item"><span class="swatch new"></span>nieuw vandaag</span>
     </div>
 </div>
 <div id="footer"></div>
