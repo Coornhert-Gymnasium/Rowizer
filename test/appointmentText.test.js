@@ -45,7 +45,8 @@ test("kortste lokaalnaam wordt getoond", () => {
     assert.equal(appointmentText(mainGroup, appointment({locations: ["leerplein a", "a030"]})), "hv1c fa cir a030")
 })
 
-// Huidig gedrag, fout: bij drie docenten hoort "+1" (plan stap 1.2).
-test("drie docenten (huidig gedrag, wordt gerepareerd in stap 1.2)", () => {
-    assert.equal(appointmentText(mainGroup, appointment({teachers: ["a", "b", "c"]})), "hv1c fa a,b+2 a268")
+test("meer dan twee docenten: twee namen en het aantal dat niet getoond wordt", () => {
+    assert.equal(appointmentText(mainGroup, appointment({teachers: ["a", "b", "c"]})), "hv1c fa a,b+1 a268")
+    assert.equal(appointmentText(mainGroup, appointment({teachers: ["a", "b", "c", "d", "e"]})), "hv1c fa a,b+3 a268")
+    assert.equal(appointmentText(mainGroup, appointment({teachers: ["a", "b"]})), "hv1c fa a,b a268")
 })

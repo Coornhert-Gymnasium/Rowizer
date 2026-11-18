@@ -39,7 +39,8 @@ export function appointmentText(entity, appointment) {
 
     str += appointment.teachers.slice(0, 2).join(",")
     if (appointment.teachers.length > 2) {
-        str += "+" + (appointment.teachers.length - 1).toString()
+        // het aantal docenten dat niet getoond wordt
+        str += "+" + (appointment.teachers.length - 2).toString()
     }
     str += " "
 
