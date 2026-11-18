@@ -10,6 +10,8 @@ import OutOfOffice from "./controllers/outofoffice/outOfOffice.js";
 import {OutOfOfficeUiManager} from "./views/outOfOffice/outOfOfficeUiManager.js";
 import {VERSION} from "./version.js";
 import DayRollover from "./dayRollover.js";
+import Scheduler from "./scheduler.js";
+import {computeStatus} from "./status.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -55,6 +57,46 @@ var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#out
 window.cm = changesUiManager
 window.zc = connector
 
+// Eén planner voor alle verversloops (plan stap R.10): elke 5 minuten, na een mislukte ronde
+// na een minuut, met een willekeurige start zodat schermen niet gelijk lopen.
+let scheduler = new Scheduler({onRound: () => updateStatus()})
+scheduler.listen()
+window.rowizerScheduler = scheduler
+
+let absences_allowed = true
+
+// Laat op het scherm zien hoe actueel de gegevens zijn (besluit 9: neutrale tekst, de oorzaak
+// als korte code rechtsonder).
+let updateStatus = function(){
+    let status = computeStatus({
+        now: Date.now(),
+        isReady: connector.isReady,
+        loadError: connector.loadError,
+        health: zapi.session.health,
+        changes: scheduler.task("changes"),
+        changesFailure: changesUiManager.lastFailure,
+        absences: absences_allowed ? scheduler.task("absences") : undefined,
+    })
+
+    let bar = document.querySelector("#status")
+    bar.textContent = status.bar ? status.bar.text : ""
+    bar.style.display = status.bar ? null : "none"
+    bar.classList.toggle("error", !!status.bar && status.bar.level === "error")
+
+    if(status.boardMessage && !connector.isReady){
+        changesUiManager.showMessage(status.boardMessage)
+    }
+
+    document.querySelector("#footer").textContent = [status.code, status.updated, VERSION].filter(Boolean).join(" · ")
+
+    let absences_container = document.querySelector("#absences-container")
+    absences_container.classList.toggle("stale", status.absences === "stale")
+    document.querySelector("#absences-note").textContent = status.absencesNote || ""
+    if(status.absences === "hidden"){
+        absences_container.style.display = "none"
+    }
+}
+
 let showTitle = function(){
     document.querySelector("#title").textContent = "Roosterwijzigingen " + connector.date.toLocaleString("nl-NL", {
         weekday: 'long',
@@ -63,13 +105,6 @@ let showTitle = function(){
         day: 'numeric'
     })
 }
-
-// Alle verversloops, zodat ze na een dagwissel direct opnieuw kunnen lopen.
-let loops = []
-let refreshNow = function(){
-    loops.forEach(loop => loop.now())
-}
-let last_update = null
 
 // Nieuwe dag (plan stap R.7): gisteren weghalen, basisgegevens van vandaag laden en verversen,
 // zonder de pagina te herladen. Zolang de basisgegevens niet geladen zijn, toont het bord een melding.
@@ -88,9 +123,9 @@ let switchDay = async function(date){
     try {
         await loading
     } catch (e) {
-        // de verversloop probeert het opnieuw (zie ChangesUiManager.refreshTable)
+        // de verversronde probeert het opnieuw (zie ChangesUiManager.refreshTable)
     }
-    refreshNow()
+    scheduler.runNow()
 }
 window.dc = switchDay
 
@@ -112,48 +147,16 @@ let nextMaintenance = function(){
 }
 let maintenance_at = nextMaintenance()
 
-// Laat op het scherm zien als de getoonde gegevens niet actueel zijn.
-let showStatus = function(text){
-    let status = document.querySelector("#status")
-    status.textContent = text || ""
-    status.style.display = text ? null : "none"
-}
-
-// Ververst elke 5 minuten, na een fout al na een minuut. Een nieuwe ronde start pas als de vorige klaar is.
-let keepRefreshing = function(refresh){
-    let timer = null
-    let running = false
-    let run = async function(){
-        clearTimeout(timer)
-        if(running){
-            return
-        }
-        running = true
-        let ok = false
-        try {
-            ok = await refresh()
-        }
-        catch(err){
-            console.error(err)
-        }
-        running = false
-        timer = setTimeout(run, ok ? REFRESH_INTERVAL : RETRY_INTERVAL)
-    }
-    run()
-    let loop = {now: run}
-    loops.push(loop)
-    return loop
-}
-
-// Elke minuut: dagwissel, basisgegevens verversen als ze ouder zijn dan een uur, en de
-// onderhoudsherlading. Staat los van het laden van data, zodat het ook werkt als dat faalt.
+// Elke minuut: dagwissel, basisgegevens verversen als ze ouder zijn dan een uur, de
+// onderhoudsherlading en de status. Staat los van het laden van data, zodat het ook werkt als dat faalt.
 let started_at = Date.now()
 setInterval(()=> {
     rollover.check()
     connector.refreshIfStale()
 
     if(Date.now() >= maintenance_at){
-        let healthy = zapi.session.health.state === "ok" && last_update && Date.now() - last_update < 15*60*1000
+        let last_success = scheduler.task("changes")?.lastSuccess
+        let healthy = zapi.session.health.state === "ok" && last_success && Date.now() - last_success < 15*60*1000
         if(healthy){
             window.rowizerReload()
         } else {
@@ -163,32 +166,16 @@ setInterval(()=> {
 
     // Zonder basisgegevens kan niets laden. De connector probeert het zelf opnieuw; alleen als
     // dat na STARTUP_TIMEOUT nog niet gelukt is, herladen we de pagina.
-    if(!connector.isReady){
-        if(connector.loadError){
-            showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
-        }
-        if(Date.now() - started_at > STARTUP_TIMEOUT){
-            window.rowizerReload()
-        }
+    if(!connector.isReady && Date.now() - started_at > STARTUP_TIMEOUT){
+        window.rowizerReload()
     }
+    updateStatus()
 }, RETRY_INTERVAL)
 
-connector.waitUntilReady().then(a=>{
-    keepRefreshing(async ()=>{
-        let ok = await changesUiManager.refreshTable();
-        if(ok){
-            last_update = new Date()
-            showStatus()
-        }
-        else{
-            let time = last_update && last_update.toLocaleTimeString("nl-NL", {hour: '2-digit', minute: '2-digit'})
-            showStatus("Geen verbinding met Zermelo" + (time ? ", laatste update " + time : ""))
-        }
-        return ok
-    })
+connector.waitUntilReady().then(()=>{
+    scheduler.add("changes", () => changesUiManager.refreshTable(), {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
 
-    let absences_allowed = true
-    keepRefreshing(async ()=>{
+    scheduler.add("absences", async ()=>{
         if(!absences_allowed){
             return true
         }
@@ -208,10 +195,10 @@ connector.waitUntilReady().then(a=>{
             }
             throw err
         }
-    })
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
 
     let external_location_known = false
-    keepRefreshing(async ()=>{
+    scheduler.add("outofoffice", async ()=>{
         if(!external_location_known){
             await outofoffice.setExternalLocationName(param_external)
             external_location_known = true
@@ -219,12 +206,16 @@ connector.waitUntilReady().then(a=>{
         await outOfOfficeUiManager.refresh()
         document.querySelector("#outofoffice-container").style.display = outofoffice.outOfOffices.length ? null : "none"
         return true
-    })
-}).catch(err=>{
-    console.error(err)
-    showStatus("Rooster kan niet worden geladen, opnieuw proberen...")
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+
+    // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
+    // stroomstoring) lopen daarna niet gelijk.
+    scheduler.start()
 })
 
+connector.onLoad = () => updateStatus()
+
 showTitle()
+updateStatus()
 
 window.rowizerStarted = true

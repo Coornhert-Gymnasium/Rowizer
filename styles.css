@@ -193,3 +193,33 @@ div.appointment.activity.cancelled{
     color: rgb(255,200,60);
     padding: 0 1em;
 }
+/* langer dan een uur geen verse gegevens: over de volle breedte, rood */
+#status.error {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 10;
+    padding: .3em 1em;
+    color: white;
+    background-color: rgb(180,30,30);
+    text-align: center;
+}
+
+/* afwezigen langer dan 30 minuten niet ververst */
+#absences-container.stale {
+    opacity: .5;
+}
+#absences-note {
+    margin-left: 5px;
+}
+
+/* versie, laatste update en foutcode: klein, rechtsonder */
+#footer {
+    position: fixed;
+    right: 4px;
+    bottom: 2px;
+    font-size: 10px;
+    font-weight: normal;
+    color: rgba(255,255,255,.6);
+}

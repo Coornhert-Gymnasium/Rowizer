@@ -212,6 +212,12 @@ export default class ZermeloConnector {
             }
             finally {
                 this.#loading = null
+                // bv. de status op het scherm bijwerken
+                try {
+                    this.onLoad?.()
+                } catch (e) {
+                    console.error(e)
+                }
             }
         })()
         return this.#loading

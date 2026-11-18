@@ -228,7 +228,7 @@ export class ChangesUiManager {
                 await this.connector.reload()
             } catch (e) {
                 console.error(e)
-                this.lastFailure = "load"
+                this.lastFailure = e
                 return false
             }
         }
@@ -238,7 +238,7 @@ export class ChangesUiManager {
         }
         catch (e){
             console.error(e)
-            this.lastFailure = "load"
+            this.lastFailure = e
             return false;
 
         }
