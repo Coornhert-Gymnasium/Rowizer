@@ -153,7 +153,7 @@ let updateStatus = function(){
         absences: absences_allowed ? scheduler.task("absences") : undefined,
         clockOffset: clockOffset(),
         // alleen als de laatste ronde slaagde: een storing blijft ook in rusttijd zichtbaar
-        resting: resting() && scheduler.task("changes")?.failures === 0,
+        resting: resting() && scheduler.task("changes")?.failures === 0 && !!scheduler.task("changes")?.lastSuccess,
     })
 
     let bar = document.querySelector("#status")
