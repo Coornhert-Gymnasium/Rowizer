@@ -1,3 +1,5 @@
+import {slotText} from "../../controllers/changes/movedLessons.js"
+
 /**
  * De tekst van één item op het bord, zonder DOM: zo is hij te testen.
  * @param entity de groep (of de nepgroep voor keuzelessen en toetsen) waarvoor het item getoond wordt
@@ -47,7 +49,10 @@ export function appointmentText(entity, appointment) {
     }
     str += " "
 
-    if (!appointment.cancelled && appointment.valid) {
+    if (!appointment.valid && appointment.movedTo) {
+        // oude versie van een verplaatste les (plan stap 3.3)
+        str += "verplaatst naar " + slotText(appointment.movedTo)
+    } else if (!appointment.cancelled && appointment.valid) {
         // dit gaat door: kortste lokaalnaam (op een kopie: de afspraak zelf blijft ongewijzigd),
         // +n bij meer lokalen, en de tijd voor afspraken zonder lesuur
         let locations = [...appointment.locations].sort((a,b)=>a.length-b.length)

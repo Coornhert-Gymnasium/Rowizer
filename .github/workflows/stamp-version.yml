@@ -1,0 +1,36 @@
+# Zet de versiestempel in js/version.js na elke push naar master (plan stap 3.5, besluit 4).
+# Schermen zien de nieuwe versie binnen een kwartier en herladen zichzelf.
+#
+# Alleen in tomkooij/Rowizer: in andere kopieën (zoals de live-repo) blijft de stempel handwerk
+# met scripts/stamp-version.sh. Een push met GITHUB_TOKEN start geen nieuwe workflows, dus
+# de stempelcommit zelf geeft geen lus.
+name: stamp-version
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stamp-version
+  cancel-in-progress: false
+
+jobs:
+  stamp:
+    if: github.repository == 'tomkooij/Rowizer'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stempel zetten
+        run: |
+          sh scripts/stamp-version.sh
+          if git diff --quiet -- js/version.js; then
+            echo "Stempel ongewijzigd"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update version stamp" -- js/version.js
+          git push

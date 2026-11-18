@@ -1,6 +1,7 @@
 import ChangedRecordHolder from "./lib/changedRecordHolder.js";
 import {mergeSubsequentAppointments, arraysEqual} from "../../zermelo/utils/mergeAppointments.js";
 import {countOutOfGrid, countUnknownReference} from "../../diagnostics.js";
+import {linkMovedLessons} from "./movedLessons.js";
 
 class Changes {
     #date;
@@ -162,6 +163,8 @@ class Changes {
         // LET OP: mergeSubsequentAppointments returned een array (lijst),
         //  modified_appointments is hierboven een object (dictionary) met appointment.id als key en appointment als value
         modified_appointments = Object.values(modified_appointments)
+        // oude versie van een verplaatste les: "verplaatst naar u4" op het oude uur (plan stap 3.3)
+        linkMovedLessons(modified_appointments)
         if(this.#mergeMultipleHourSpan){
             modified_appointments =  mergeSubsequentAppointments(modified_appointments)
             //this.#combineSpansMultipleHours(modified_appointments)

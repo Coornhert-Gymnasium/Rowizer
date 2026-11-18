@@ -7,6 +7,7 @@
 1 | 7-7 | lesson cancelled | hv1f gd krh  vervalt
 1 | 3-3 | lesson | hv1g gd dri a236
 1 | 4-4 | lesson | hv1g wi vos b014
+1 | 7-7 | lesson moved | hv1g wi vos verplaatst naar u4
 2 | 7-8 | exam | bk2a rek dia a244 14:00-14:50
 2 | 7-8 | exam | bk2b rek dms a246 14:00-14:50
 2 | 6-6 | exam | bk2c rek cao a270 12:55-13:45

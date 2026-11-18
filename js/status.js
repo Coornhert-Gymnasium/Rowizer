@@ -45,6 +45,7 @@ export function errorCode(error) {
  * @param input.changesFailure "load" | "render" | null (ChangesUiManager.lastFailure)
  * @param input.absences taak uit de planner, of undefined als afwezigen uit staan
  * @param input.clockOffset afwijking van de klok van dit scherm, voor het tonen van tijden
+ * @param input.resting rusttijd (plan stap 3.2): er wordt bewust niet ververst
  * @return {{bar: null|{level: string, text: string}, boardMessage: string|null, code: string|null,
  *           updated: string|null, absences: "fresh"|"stale"|"hidden", absencesNote: string|null}}
  */
@@ -76,6 +77,12 @@ export function computeStatus(input) {
     let cause = healthError || changesError || (changes && changes.lastError) || (changesFailure === "render" ? "render" : null)
     if (cause) {
         result.code = errorCode(cause)
+    }
+
+    // In rusttijd (plan stap 3.2) staat het bord bewust stil: geen waarschuwing, de afwezigen blijven.
+    if (input.resting) {
+        result.code = "rust"
+        return result
     }
 
     if (cause && age > STALE_WARN) {

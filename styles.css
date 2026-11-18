@@ -157,6 +157,14 @@ div.appointment.cancelled{
 .cancelled-word{
     color: rgb(120,0,0);
 }
+/* oude uur van een verplaatste les (plan stap 3.3): oranje streepjeslijn, anders dan uitval */
+div.appointment.moved{
+    background-color: rgba(255,255,255,.5);
+    border-left: .3rem dashed rgb(200,110,0);
+}
+.moved-word{
+    color: rgb(140,70,0);
+}
 
 
 /**afwezigen**/
@@ -275,6 +283,9 @@ div.appointment.cancelled{
 }
 .swatch.cancelled{
     border-left: .3rem solid rgb(170,0,0);
+}
+.swatch.moved{
+    border-left: .3rem dashed rgb(200,110,0);
 }
 .swatch.new{
     box-shadow: inset 0 0 .4rem #ff0000;

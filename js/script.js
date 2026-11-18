@@ -13,12 +13,14 @@ import DayRollover from "./dayRollover.js";
 import Scheduler from "./scheduler.js";
 import {computeStatus} from "./status.js";
 import {checkToken, tokenNote} from "./tokenCheck.js";
-import {readSettings} from "./settings.js";
+import {readSettings, rememberToken, urlWithoutToken} from "./settings.js";
 import {missingSettings, showSetupScreen} from "./setupScreen.js";
 import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
 import {measureClockOffset, clockNote} from "./clockCheck.js";
 import diagnostics from "./diagnostics.js";
+import {parseWindow, isResting} from "./activeWindow.js";
+import {fetchVersion, shouldReload, triedStore} from "./versionCheck.js";
 
 const REFRESH_INTERVAL = 5*60*1000
 const RETRY_INTERVAL = 60*1000
@@ -32,6 +34,12 @@ console.log("Rowizer loaded, version " + VERSION)
 
 // Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
 let params = readSettings(window.location)
+// rememberToken=1 (plan stap 3.6): token bewaren en uit de adresbalk halen
+let local_storage = null
+try { local_storage = window.localStorage } catch (e) { /* geen opslag */ }
+if(local_storage && rememberToken(params, local_storage)){
+    history.replaceState(null, "", urlWithoutToken(window.location.href))
+}
 let param_debug = params.get("debug") === "1"
 
 // Grootte van alles op het scherm bijstellen zonder browserzoom (plan stap 2.1), bv. scale=1.2.
@@ -81,6 +89,8 @@ let param_ignore = params.get("departmentsIgnore");
 let param_merge = params.get("mergeAppointments")
 let param_external = params.get("external")
 param_external = param_external ? param_external : "extern"
+// verversvenster (plan stap 3.2), bv. active=07:00-17:00, of active=off voor altijd
+let active_window = parseWindow(params.get("active"))
 
 var zapi = new ZermeloApi({
     portal: params.get("portal"),
@@ -106,9 +116,18 @@ var outOfOfficeUiManager = new OutOfOfficeUiManager(document.querySelector("#out
 window.cm = changesUiManager
 window.zc = connector
 
+// Rusttijd (plan stap 3.2): buiten het venster of op een dag zonder lessen niet verversen.
+let resting = () => isResting({
+    window: active_window,
+    now: appNow(),
+    isReady: connector.isReady && connector.isCurrent,
+    lessons: connector.isReady ? connector.getTodayTimeSlots().length : 0,
+})
+let was_resting = false
+
 // Eén planner voor alle verversloops (plan stap R.10): elke 5 minuten, na een mislukte ronde
 // na een minuut, met een willekeurige start zodat schermen niet gelijk lopen.
-let scheduler = new Scheduler({onRound: task => {
+let scheduler = new Scheduler({isResting: resting, onRound: task => {
     // een geslaagde ronde haalt de rem van de waakhond (index.html)
     if(task.failures === 0 && window.rowizerReloadOk){
         window.rowizerReloadOk()
@@ -133,6 +152,8 @@ let updateStatus = function(){
         changesFailure: changesUiManager.lastFailure,
         absences: absences_allowed ? scheduler.task("absences") : undefined,
         clockOffset: clockOffset(),
+        // alleen als de laatste ronde slaagde: een storing blijft ook in rusttijd zichtbaar
+        resting: resting() && scheduler.task("changes")?.failures === 0 && !!scheduler.task("changes")?.lastSuccess,
     })
 
     let bar = document.querySelector("#status")
@@ -198,7 +219,8 @@ let rollover = new DayRollover({
 })
 
 // Eens per nacht de pagina herladen, zodat een nieuwe versie op het scherm komt; alleen als
-// Zermelo bereikbaar is, anders later opnieuw. Vervalt zodra stap 3.5 (versiecontrole) er is.
+// Zermelo bereikbaar is, anders later opnieuw. Een nieuwe versie komt sinds stap 3.5 al binnen een
+// kwartier; dit blijft voor een schone start per dag (geheugen) op een scherm dat dag en nacht aan staat.
 let nextMaintenance = function(){
     let at = new Date(appNow())
     at.setHours(MAINTENANCE_HOUR, 0, 0, 0)
@@ -209,18 +231,36 @@ let nextMaintenance = function(){
 }
 let maintenance_at = nextMaintenance()
 
+// Alleen herladen (onderhoud, nieuwe versie) als Zermelo bereikbaar is en het bord actueel:
+// anders staat er na het herladen niets meer op.
+let healthy = function(){
+    let changes_task = scheduler.task("changes")
+    let last_success = changes_task?.lastSuccess
+    // in rusttijd is de laatste ronde vanzelf ouder dan een kwartier
+    let recent = last_success && (Date.now() - last_success < 15*60*1000 || (resting() && changes_task.failures === 0))
+    return zapi.session.health.state === "ok" && !!recent
+}
+
 // Elke minuut: dagwissel, basisgegevens verversen als ze ouder zijn dan een uur, de
 // onderhoudsherlading en de status. Staat los van het laden van data, zodat het ook werkt als dat faalt.
 let started_at = Date.now()
 setInterval(()=> {
     rollover.check()
-    connector.refreshIfStale()
     changesUiManager.markTime()
 
+    // Begin van het verversvenster: direct verversen, niet pas na de volgende geplande ronde.
+    let rest = resting()
+    if(was_resting && !rest){
+        console.info("Active window started, refreshing")
+        connector.refreshIfStale()
+        scheduler.runNow()
+    } else if(!rest){
+        connector.refreshIfStale()
+    }
+    was_resting = rest
+
     if(appNow() >= maintenance_at){
-        let last_success = scheduler.task("changes")?.lastSuccess
-        let healthy = zapi.session.health.state === "ok" && last_success && Date.now() - last_success < 15*60*1000
-        if(healthy){
+        if(healthy()){
             window.rowizerReload("nightly maintenance")
         } else {
             maintenance_at = appNow() + 10*60*1000
@@ -241,7 +281,7 @@ setInterval(()=> {
 }, RETRY_INTERVAL)
 
 connector.waitUntilReady().then(()=>{
-    scheduler.add("changes", () => changesUiManager.refreshTable(), {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+    scheduler.add("changes", () => changesUiManager.refreshTable(), {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL, rest: true})
 
     scheduler.add("absences", async ()=>{
         if(!absences_allowed){
@@ -265,7 +305,7 @@ connector.waitUntilReady().then(()=>{
             }
             throw err
         }
-    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL, rest: true})
 
     let external_location_known = false
     scheduler.add("outofoffice", async ()=>{
@@ -276,7 +316,7 @@ connector.waitUntilReady().then(()=>{
         await outOfOfficeUiManager.refresh()
         document.querySelector("#outofoffice-container").style.display = outofoffice.outOfOffices.length ? null : "none"
         return true
-    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL})
+    }, {interval: REFRESH_INTERVAL, retryInterval: RETRY_INTERVAL, rest: true})
 
     // Zelfcontrole van het token (plan stap R.12): eens per dag, na een fout over een uur opnieuw.
     scheduler.add("token", async ()=>{
@@ -290,6 +330,23 @@ connector.waitUntilReady().then(()=>{
         rollover.check()
         return true
     }, {interval: 60*60*1000, retryInterval: 15*60*1000})
+
+    // Nieuwe versie op de webserver (plan stap 3.5): herladen. Gaat naar de eigen webserver, niet
+    // naar Zermelo. Is het bord niet gezond, dan het volgende kwartier opnieuw.
+    scheduler.add("version", async ()=>{
+        let remote = await fetchVersion({url: new URL("./version.js", import.meta.url)})
+        if(shouldReload({loaded: VERSION, remote, tried: triedStore.get()})){
+            if(!healthy()){
+                console.info("New version " + remote + " available, waiting until the board is up to date")
+                return true
+            }
+            triedStore.set(remote)
+            window.rowizerReload("new version " + remote)
+        } else if(remote && remote !== VERSION){
+            console.warn("Version " + remote + " is on the server, but " + VERSION + " was loaded again (cache?)")
+        }
+        return true
+    }, {interval: 15*60*1000, retryInterval: 15*60*1000})
 
     // Willekeurige start tussen 0 en 20 s: schermen die tegelijk opstarten (bv. na een
     // stroomstoring) lopen daarna niet gelijk.
