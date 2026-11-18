@@ -14,6 +14,7 @@ import Scheduler from "./scheduler.js";
 import {computeStatus} from "./status.js";
 import {checkToken, tokenNote} from "./tokenCheck.js";
 import {readSettings} from "./settings.js";
+import {missingSettings, showSetupScreen} from "./setupScreen.js";
 import {installErrorHandlers, showDebugPanel} from "./debugPanel.js";
 import {now as appNow, setClockOffset, clockOffset} from "./appTime.js";
 import {measureClockOffset, clockNote} from "./clockCheck.js";
@@ -32,6 +33,19 @@ console.log("Rowizer loaded, version " + VERSION)
 // Instellingen uit het fragment (#portal=...&token=..., aanbevolen: gaat niet naar de webserver) of de query.
 let params = readSettings(window.location)
 let param_debug = params.get("debug") === "1"
+
+// Zonder portal of token kan niets (plan stap 1.4): instelscherm, geen verzoeken naar Zermelo.
+// De waakhond (index.html) krijgt een hartslag, want herladen lost dit niet op. De lege belofte
+// houdt de rest van deze module tegen.
+let missing = missingSettings(params)
+if(missing.length){
+    console.warn("Rowizer is not configured, missing: " + missing.join(", "))
+    showSetupScreen(missing)
+    window.rowizerStarted = true
+    window.rowizerHeartbeat = Date.now()
+    setInterval(() => { window.rowizerHeartbeat = Date.now() }, 60*1000)
+    await new Promise(() => {})
+}
 
 // Klok controleren voordat we bepalen welke dag het is (plan stap R.6). Hoogstens 5 seconden:
 // zonder antwoord gaan we uit van de eigen klok.

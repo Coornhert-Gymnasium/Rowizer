@@ -197,6 +197,12 @@ div.appointment.activity.cancelled{
     font-size: 2em;
 }
 
+.setup-detail {
+    margin-top: .5em;
+    font-size: .5em;
+    font-weight: normal;
+}
+
 .board-message {
     margin: auto;
     padding: 1em 2em;
