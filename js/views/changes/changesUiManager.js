@@ -257,6 +257,16 @@ export class ChangesUiManager {
             }
         }
 
+        // Vakantie of vrije dag: geen wijzigingen ophalen, alleen de naam (plan §5 bij stap 3.2).
+        let holiday = this.connector.holiday
+        if (holiday) {
+            this.showMessage(NO_LESSONS_TEXT + " – " + holiday)
+            this.drawnSnapshot = this.connector.snapshot
+            this.lastFailure = null
+            this.tableReady = true
+            return true
+        }
+
         try{
             var changed = await this.changesManager.loadData()
         }

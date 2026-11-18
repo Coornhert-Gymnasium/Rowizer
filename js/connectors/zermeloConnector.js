@@ -118,6 +118,14 @@ export default class ZermeloConnector {
     get departments(){
         return this.#current?.departments
     }
+    /** Naam van de vakantie of vrije dag van de getoonde dag, of null (plan §5 bij stap 3.2). */
+    get holiday(){
+        let holidays = this.#current?.holidays || []
+        let d = this.#date
+        let key = String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0")
+        let found = holidays.find(h => h.start <= key && key <= h.end)
+        return found ? found.name : null
+    }
 
     getGroupInDepartment(id){
         return this.#current?.groupsInDepartment[id]
@@ -315,9 +323,24 @@ export default class ZermeloConnector {
                 return department && !this.#options.ignoreDepartmentCodes.includes(department.code)
             })
 
+        // Vakanties en vrije dagen (plan §5 bij stap 3.2). Niet nodig voor het bord: een fout,
+        // bv. een token zonder dit recht, blokkeert niets.
+        let holidays = []
+        try {
+            holidays = (await api.session.request("holidays", {
+                schoolInSchoolYear: branchOfSchool.schoolInSchoolYear,
+                fields: ["id", "name", "start", "end"],
+            }))
+                .filter(h => h && typeof h.name === "string" && /^\d{8}$/.test(h.start) && /^\d{8}$/.test(h.end))
+                .map(h => Object.freeze({name: h.name, start: h.start, end: h.end}))
+        } catch (e) {
+            console.warn("Holidays not available, continuing without", e)
+        }
+
         return Object.freeze({
             loadedAt: this.#now(),
             forDate: date.toDateString(),
+            holidays,
             schoolYear,
             week,
             branch,

@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1001943,
+    "schoolInSchoolYear": 1001702,
+    "name": "Zomervakantie 2026",
+    "start": "20260822",
+    "end": "20260830"
+  },
+  {
+    "id": 1001944,
+    "schoolInSchoolYear": 1001702,
+    "name": "Herfstvakantie",
+    "start": "20261017",
+    "end": "20261025"
+  },
+  {
+    "id": 1001945,
+    "schoolInSchoolYear": 1001702,
+    "name": "Kerstvakantie",
+    "start": "20261219",
+    "end": "20270103"
+  },
+  {
+    "id": 1001946,
+    "schoolInSchoolYear": 1001702,
+    "name": "Voorjaarsvakantie",
+    "start": "20270220",
+    "end": "20270228"
+  },
+  {
+    "id": 1001947,
+    "schoolInSchoolYear": 1001702,
+    "name": "Tweede paasdag",
+    "start": "20270329",
+    "end": "20270329"
+  },
+  {
+    "id": 1001948,
+    "schoolInSchoolYear": 1001702,
+    "name": "Meivakantie",
+    "start": "20270424",
+    "end": "20270502"
+  },
+  {
+    "id": 1001949,
+    "schoolInSchoolYear": 1001702,
+    "name": "Bevrijdingsdag",
+    "start": "20270505",
+    "end": "20270505"
+  },
+  {
+    "id": 1001950,
+    "schoolInSchoolYear": 1001702,
+    "name": "Hemelvaartsdag",
+    "start": "20270506",
+    "end": "20270506"
+  },
+  {
+    "id": 1001951,
+    "schoolInSchoolYear": 1001702,
+    "name": "Tweede pinksterdag",
+    "start": "20270517",
+    "end": "20270517"
+  },
+  {
+    "id": 1001952,
+    "schoolInSchoolYear": 1001702,
+    "name": "Zomervakantie 2027",
+    "start": "20270717",
+    "end": "20270725"
+  }
+]

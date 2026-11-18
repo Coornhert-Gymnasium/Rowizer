@@ -168,6 +168,7 @@ let resting = () => isResting({
     now: appNow(),
     isReady: connector.isReady && connector.isCurrent,
     lessons: connector.isReady ? connector.getTodayTimeSlots().length : 0,
+    holiday: connector.isReady ? connector.holiday : null,
 })
 let was_resting = false
 

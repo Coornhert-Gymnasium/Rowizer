@@ -94,6 +94,7 @@ const fixtures = {
     }),
     timeslotnames: await get("timeslotnames", {schoolInSchoolYear: scope.schoolInSchoolYear}),
     realizedweektimetables: await get("realizedweektimetables", {schoolInSchoolYear: scope.schoolInSchoolYear, week}),
+    holidays: await get("holidays", {schoolInSchoolYear: scope.schoolInSchoolYear, fields: ["id", "name", "start", "end", "schoolInSchoolYear"]}),
     employeeabsences: await get("employeeabsences", {
         branchOfSchool: scope.branchOfSchool, startWeek: week, endWeek: week,
         fields: ["id", "start", "end", "absenceType", "employee", "absenceTypeCode", "lastModified"]
