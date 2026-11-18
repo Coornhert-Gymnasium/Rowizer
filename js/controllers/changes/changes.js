@@ -1,5 +1,6 @@
 import ChangedRecordHolder from "./lib/changedRecordHolder.js";
 import {mergeSubsequentAppointments, arraysEqual} from "../../zermelo/utils/mergeAppointments.js";
+import {countOutOfGrid, countUnknownReference} from "../../diagnostics.js";
 
 class Changes {
     #date;
@@ -137,6 +138,26 @@ class Changes {
             }
         })
 
+        // Geen afspraak mag buiten het raster vallen: één verkeerd lesuur zou de kolommen van de
+        // hele jaarlaag verschuiven (plan stap R.8).
+        let ranks = Object.values(this.connector.timeslots || {}).map(t => t.rank).filter(Number.isFinite)
+        let lastSlot = ranks.length ? Math.max(...ranks) : 1
+        Object.values(modified_appointments).forEach(appointment => {
+            let start = Number.isFinite(appointment.startTimeSlot) ? appointment.startTimeSlot : 1
+            let end = Number.isFinite(appointment.endTimeSlot) ? appointment.endTimeSlot : start
+            if(end < start){
+                [start, end] = [end, start]
+            }
+            start = Math.min(Math.max(start, 1), lastSlot)
+            end = Math.min(Math.max(end, start), lastSlot)
+            if(start !== appointment.startTimeSlot || end !== appointment.endTimeSlot){
+                console.warn("Appointment " + appointment.id + ": timeslots " + appointment.startTimeSlot + "-" + appointment.endTimeSlot + " outside the grid, showing " + start + "-" + end)
+                countOutOfGrid()
+                appointment.startTimeSlot = start
+                appointment.endTimeSlot = end
+            }
+        })
+
         // LET OP: mergeSubsequentAppointments returned een array (lijst),
         //  modified_appointments is hierboven een object (dictionary) met appointment.id als key en appointment als value
         modified_appointments = Object.values(modified_appointments)
@@ -163,6 +184,7 @@ class Changes {
                 let department = group && this.connector.departments[group.departmentOfBranch]
                 if(!department){
                     console.warn("Appointment " + appointment.id + ": unknown group or department for group " + group_id)
+                    countUnknownReference()
                     return
                 }
 

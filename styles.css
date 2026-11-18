@@ -79,6 +79,9 @@ html{
     width: 100%;
     grid-template-columns: repeat(var(--timeslots, 1), 1fr);
     align-content: start;
+    /* vangnet: een item buiten het raster maakt geen extra (zichtbare) kolommen */
+    grid-auto-columns: 0;
+    overflow-x: hidden;
 }
 
 .schedule-content{

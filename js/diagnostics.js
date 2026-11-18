@@ -7,6 +7,12 @@ const diagnostics = {
     droppedRows: {},
     // aantal keren dat een afspraak naar een onbekende groep, afdeling of leerling verwees
     unknownReferences: 0,
+    // aantal keren dat een afspraak een lesuur buiten het raster had
+    outOfGrid: 0,
+}
+
+export function countOutOfGrid() {
+    diagnostics.outOfGrid++
 }
 
 export function countDroppedRows(endpoint, count) {
