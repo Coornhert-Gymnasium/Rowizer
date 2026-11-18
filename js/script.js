@@ -240,15 +240,12 @@ connector.waitUntilReady().then(()=>{
         if(!absences_allowed){
             return true
         }
-        // dag zonder lessen: geen afwezigenregel (plan stap 1.5)
-        if(!connector.getTodayTimeSlots().length){
-            document.querySelector("#absences-container").style.display = "none"
-            return true
-        }
         try {
             let ok = await absencesUiManager.refresh()
             if(ok){
-                document.querySelector("#absences-container").style.display = null
+                // alleen een afwezigenregel als er afwezigen zijn (plan stap 1.5): geen leeg
+                // "Afwezig:" in het weekend of op een dag zonder afwezigen
+                document.querySelector("#absences-container").style.display = absencesUiManager.element.children.length ? null : "none"
             }
             return ok
         }

@@ -7,9 +7,18 @@ import {buildBoard} from "./helpers/board.js"
 
 test("lege toestand", () => {
     assert.equal(emptyState(0, 0), "no-lessons")
-    assert.equal(emptyState(0, 3), "no-lessons", "geen lesuren: ook niet tonen wat er toch is")
+    assert.equal(emptyState(0, 3), null, "geen lesuren maar wel items: items tonen")
     assert.equal(emptyState(10, 0), "no-changes")
     assert.equal(emptyState(10, 62), null)
+})
+
+test("lesdag zonder weekrooster maar met wijzigingen: wijzigingen blijven zichtbaar", async () => {
+    let {connector, changes, ui} = await buildBoard("2026-09-23", {intercept: e => e === "realizedweektimetables" ? [] : undefined})
+    await changes.loadData()
+    let items = ui.collectChanges().length
+    assert.equal(connector.getTodayTimeSlots().length, 0)
+    assert.equal(items, 62)
+    assert.equal(emptyState(0, items), null)
 })
 
 test("zaterdag 26-9-2026: geen lessen", async () => {

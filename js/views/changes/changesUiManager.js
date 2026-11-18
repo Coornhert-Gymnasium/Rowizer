@@ -6,16 +6,17 @@ export const NO_LESSONS_TEXT = "Vandaag geen lessen"
 export const NO_CHANGES_TEXT = "Geen roosterwijzigingen"
 
 /**
- * Wat het bord toont als er niets is (plan stap 1.5).
+ * Wat het bord toont als er niets is (plan stap 1.5). Items gaan altijd voor: ontbreekt het
+ * weekrooster door een fout in de gegevens, dan mogen echte wijzigingen niet verdwijnen.
  * @param lessonsToday aantal lesuren vandaag
  * @param itemCount aantal items op het bord
  * @return {"no-lessons"|"no-changes"|null}
  */
 export function emptyState(lessonsToday, itemCount) {
-    if (!lessonsToday) {
-        return "no-lessons"
+    if (itemCount) {
+        return null
     }
-    return itemCount ? null : "no-changes"
+    return lessonsToday ? "no-changes" : "no-lessons"
 }
 
 /**
